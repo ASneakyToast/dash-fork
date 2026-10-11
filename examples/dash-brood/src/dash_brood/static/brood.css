@@ -1,0 +1,22 @@
+.brood-frame {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  margin: 12px;
+}
+
+.brood-canvas {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 34px;
+  box-shadow: 0 0 0 5px #0e1118, 0 0 0 6px #2b3140, 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.brood-status {
+  min-height: 2.8em;
+  margin: 0 12px 12px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--muted);
+}
