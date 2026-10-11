@@ -2,6 +2,10 @@ import os
 from dataclasses import dataclass
 
 
+def _list(name: str) -> tuple[str, ...]:
+    return tuple(item.strip() for item in os.environ.get(name, "").split(",") if item.strip())
+
+
 def _env(name: str, default: str | None = None) -> str:
     value = os.environ.get(name, default)
     if value is None:
@@ -24,6 +28,8 @@ class Settings:
     embed_model: str
     extract_model: str
     memory_top_k: int
+    plugins: tuple[str, ...] = ()
+    plugins_disabled: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -42,4 +48,6 @@ class Settings:
             embed_model=_env("EMBED_MODEL", "amazon.titan-embed-text-v2:0"),
             extract_model=_env("EXTRACT_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
             memory_top_k=int(_env("MEMORY_TOP_K", "8")),
+            plugins=_list("DASH_PLUGINS"),
+            plugins_disabled=_list("DASH_PLUGINS_DISABLED"),
         )

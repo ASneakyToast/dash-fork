@@ -14,7 +14,7 @@ aside { width: 260px; border-right: 1px solid var(--line); display: flex; flex-d
 aside header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; }
 h1 { font-size: 18px; margin: 0; }
 #queue { font-size: 12px; color: var(--muted); }
-nav { display: flex; gap: 4px; padding: 0 10px 10px; }
+nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 10px; }
 button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 button:hover { border-color: var(--accent); }
 nav button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -34,9 +34,14 @@ main { flex: 1; display: flex; min-width: 0; }
 #composer, #memory-add { display: flex; gap: 8px; }
 textarea, input { flex: 1; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }
 #memory-search input { width: 100%; }
-#memory-list li, #app-list li, #github-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+#memory-list li, #app-list li, #github-list li, #plugin-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .meta { font-size: 12px; color: var(--muted); }
 .hint { color: var(--muted); margin: 0; }
 h2 { font-size: 16px; margin: 12px 0 0; }
 #github-create { display: flex; gap: 8px; }
 #github-create input { flex: 1; }
+#dock { width: 320px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--panel); }
+#dock[hidden] { display: none; }
+.dock-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+@media (max-width: 900px) { #dock { display: none; } }
+.error-text { color: #dc2626; }
