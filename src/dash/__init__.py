@@ -45,6 +45,7 @@ async def _worker() -> None:
     from dash.db import Store
     from dash.hermes import Hermes
     from dash.memory import memory_models
+    from dash.plugins import discover
     from dash.queue import Queue
     from dash.worker import Worker
 
@@ -59,14 +60,17 @@ async def _worker() -> None:
     queue = Queue.from_url(settings.redis_url)
     async with Store.connect(settings.database_url) as store:
         try:
-            await Worker(
+            worker = Worker(
                 store=store,
                 queue=queue,
                 chat=hermes,
                 embedder=memory,
                 extractor=memory,
                 top_k=settings.memory_top_k,
-            ).run(stop)
+                plugins=discover(settings.plugins, settings.plugins_disabled),
+            )
+            async with worker.plugins.lifespan(worker.ctx):
+                await worker.run(stop)
         finally:
             await hermes.close()
             await memory.close()

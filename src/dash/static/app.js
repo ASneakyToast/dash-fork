@@ -29,19 +29,27 @@ function closeMenu() {
 }
 
 // Tabs
-document.querySelectorAll("nav button").forEach((btn) =>
-  btn.addEventListener("click", () => {
-    document.querySelectorAll("nav button, .tab").forEach((n) => n.classList.remove("active"));
-    btn.classList.add("active");
-    closeMenu();
-    $(`#tab-${btn.dataset.tab}`).classList.add("active");
-    if (btn.dataset.tab === "memories") loadMemories();
-    if (btn.dataset.tab === "apps") {
-      loadApps();
-      loadGitHub();
-    }
-  }),
-);
+const tabHooks = {};
+
+function showTab(name) {
+  document.querySelectorAll("nav button, .tab").forEach((n) => n.classList.remove("active"));
+  document.querySelector(`nav button[data-tab="${name}"]`).classList.add("active");
+  closeMenu();
+  $(`#tab-${name}`).classList.add("active");
+  tabHooks[name]?.();
+}
+
+function bindTab(btn) {
+  btn.addEventListener("click", () => showTab(btn.dataset.tab));
+}
+
+document.querySelectorAll("nav button").forEach(bindTab);
+tabHooks.memories = () => loadMemories();
+tabHooks.apps = () => {
+  loadApps();
+  loadGitHub();
+  loadPluginList();
+};
 
 // Conversations
 async function loadConversations() {
@@ -238,6 +246,108 @@ $("#github-create").addEventListener("submit", async (e) => {
   form.submit();
 });
 
+// Plugins
+const feed = { events: [], listeners: new Set() };
+const FEED_LIMIT = 200;
+let plugins = [];
+
+function startFeed() {
+  const source = new EventSource("/api/activity");
+  source.onmessage = (e) => {
+    const event = JSON.parse(e.data);
+    feed.events = [...feed.events, event].slice(-FEED_LIMIT);
+    feed.listeners.forEach((fn) => fn(event));
+  };
+}
+
+function guarded(plugin, fn) {
+  return (...args) => {
+    try {
+      return fn(...args);
+    } catch (err) {
+      console.error(`dash plugin ${plugin.name}:`, err);
+    }
+  };
+}
+
+function hostFor(plugin) {
+  const guard = (fn) => guarded(plugin, fn);
+  const id = (name) => `${plugin.name}-${name}`;
+  return {
+    api,
+    el,
+    config: state.config,
+    plugin: {
+      name: plugin.name,
+      version: plugin.version,
+      api: (path, opts) => api(`/api/plugins/${plugin.name}${path}`, opts),
+    },
+    addTab({ id: name, title, mount }) {
+      const button = el("button", { textContent: title });
+      button.dataset.tab = id(name);
+      const root = el("section", { id: `tab-${id(name)}`, className: "tab" });
+      let mounted = false;
+      tabHooks[id(name)] = () => {
+        if (!mounted) {
+          mounted = true;
+          guard(mount)(root);
+        }
+      };
+      bindTab(button);
+      $("nav").append(button);
+      $("main").append(root);
+      return root;
+    },
+    addDock({ id: name, title, mount }) {
+      const root = el("section", { id: `dock-${id(name)}`, className: "dock-panel" });
+      root.setAttribute("aria-label", title);
+      $("#dock").append(root);
+      $("#dock").hidden = false;
+      guard(mount)(root);
+      return root;
+    },
+    onActivity(fn) {
+      const handler = guard(fn);
+      feed.events.forEach(handler);
+      feed.listeners.add(handler);
+      return () => feed.listeners.delete(handler);
+    },
+    async openConversation(conversationId) {
+      showTab("chat");
+      await openConversation(conversationId);
+    },
+    conversations: () => api("/api/conversations"),
+  };
+}
+
+async function loadPlugin(plugin) {
+  try {
+    if (plugin.style) document.head.append(el("link", { rel: "stylesheet", href: plugin.style }));
+    if (plugin.script) await (await import(plugin.script)).default(hostFor(plugin));
+  } catch (err) {
+    plugin.status = "error";
+    plugin.error = String(err);
+    console.error(`dash plugin ${plugin.name} failed to start:`, err);
+  }
+}
+
+async function loadPlugins() {
+  plugins = (await api("/api/plugins")).plugins;
+  await Promise.all(plugins.filter((p) => p.status === "ok").map(loadPlugin));
+  loadPluginList();
+}
+
+function loadPluginList() {
+  $("#plugin-list").replaceChildren(
+    ...plugins.map((p) => {
+      const meta = p.status === "ok" ? `v${p.version}` : p.error;
+      const name = el("div", {}, p.name, el("div", { className: `meta${p.status === "ok" ? "" : " error-text"}`, textContent: meta }));
+      return el("li", {}, name, el("span", { className: "meta", textContent: p.status }));
+    }),
+  );
+  if (!plugins.length) $("#plugin-list").append(el("li", { textContent: "No plugins installed." }));
+}
+
 // Queue badge
 async function pollQueue() {
   try {
@@ -256,3 +366,5 @@ if (last && list.some((c) => c.id === last)) openConversation(last);
 if (location.hash === "#apps") document.querySelector('nav button[data-tab="apps"]').click();
 pollQueue();
 setInterval(pollQueue, 5000);
+startFeed();
+loadPlugins();

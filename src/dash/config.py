@@ -2,6 +2,10 @@ import os
 from dataclasses import dataclass
 
 
+def _list(name: str) -> tuple[str, ...]:
+    return tuple(item.strip() for item in os.environ.get(name, "").split(",") if item.strip())
+
+
 def _env(name: str, default: str | None = None) -> str:
     value = os.environ.get(name, default)
     if value is None:
@@ -26,6 +30,8 @@ class Settings:
     memory_base_url: str
     memory_api_key: str
     memory_top_k: int
+    plugins: tuple[str, ...] = ()
+    plugins_disabled: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -46,4 +52,6 @@ class Settings:
             memory_base_url=_env("MEMORY_BASE_URL", "").rstrip("/"),
             memory_api_key=_env("MEMORY_API_KEY", ""),
             memory_top_k=int(_env("MEMORY_TOP_K", "8")),
+            plugins=_list("DASH_PLUGINS"),
+            plugins_disabled=_list("DASH_PLUGINS_DISABLED"),
         )

@@ -1,7 +1,8 @@
 import json
+import re
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -15,9 +16,11 @@ from dash.config import Settings
 from dash.db import Memory, Store
 from dash.memory import Embedder
 from dash.nango import Nango
+from dash.plugins import API_VERSION, Context, Plugins, discover
 from dash.queue import Queue
 
 STATIC = Path(__file__).parent / "static"
+ENTRY_ID = re.compile(r"^\d+-\d+$")
 
 
 class NewMessage(BaseModel):
@@ -50,9 +53,21 @@ def create_app(
     nango: Nango,
     public: dict[str, str] | None = None,
     routers: Sequence[APIRouter] = (),
+    plugins: Plugins | None = None,
     lifespan: Callable[[FastAPI], AbstractAsyncContextManager[None]] | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="dash", docs_url=None, redoc_url=None, lifespan=lifespan)
+    plugins = plugins or Plugins()
+    ctx = Context("api", store, queue)
+
+    @asynccontextmanager
+    async def run(app: FastAPI) -> AsyncGenerator[None]:
+        async with AsyncExitStack() as stack:
+            if lifespan:
+                await stack.enter_async_context(lifespan(app))
+            await stack.enter_async_context(plugins.lifespan(ctx))
+            yield
+
+    app = FastAPI(title="dash", docs_url=None, redoc_url=None, lifespan=run)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
@@ -115,6 +130,29 @@ def create_app(
     async def queue_status() -> dict[str, int]:
         return await queue.status()
 
+    @app.get("/api/activity")
+    async def activity(request: Request) -> StreamingResponse:
+        after = request.headers.get("last-event-id")
+        if after is not None and not ENTRY_ID.fullmatch(after):
+            raise HTTPException(400, "Bad Last-Event-ID.")
+
+        async def stream() -> AsyncIterator[str]:
+            async for item in queue.activity(after):
+                if await request.is_disconnected():
+                    return
+                if item is None:
+                    yield ": ping\n\n"
+                else:
+                    yield f"id: {item.id}\ndata: {json.dumps(item.as_json())}\n\n"
+
+        return StreamingResponse(
+            stream(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no"}
+        )
+
+    @app.get("/api/plugins")
+    async def plugin_list() -> dict[str, Any]:
+        return {"api": API_VERSION, "plugins": plugins.manifest()}
+
     @app.get("/api/memories")
     async def memories(q: str = "") -> list[dict[str, Any]]:
         if q.strip():
@@ -160,6 +198,8 @@ def create_app(
     for router in routers:
         app.include_router(router)
 
+    plugins.mount(app, ctx)
+
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
 
@@ -170,6 +210,7 @@ def create_production_app() -> FastAPI:
     from dash.memory import memory_models
 
     settings = Settings.from_env()
+    plugins = discover(settings.plugins, settings.plugins_disabled)
     store = Store.from_url(settings.database_url)
     queue = Queue.from_url(settings.redis_url)
     nango = Nango(settings.nango_url, settings.nango_secret_key)
@@ -199,5 +240,6 @@ def create_production_app() -> FastAPI:
                 public_url=settings.public_url,
             )
         ],
+        plugins=plugins,
         lifespan=lifespan,
     )
