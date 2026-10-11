@@ -27,6 +27,7 @@ select = [
 
 [lint.per-file-ignores]
 "tests/**" = ["S101"]  # assert is normal in tests
+"examples/*/tests/**" = ["S101"]
 
 [format]
 quote-style = "double"
