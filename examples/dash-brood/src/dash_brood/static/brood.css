@@ -2,34 +2,17 @@
   flex: 1;
   min-height: 0;
   position: relative;
-  margin: 12px;
 }
 
 .brood-canvas {
   position: absolute;
   inset: 0;
-  margin: auto;
-  border-radius: 34px;
-  box-shadow: 0 0 0 5px #0e1118, 0 0 0 6px #2b3140, 0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
 .brood-status {
   min-height: 2.8em;
-  margin: 0 12px 12px;
+  margin: 8px 12px calc(8px + env(safe-area-inset-bottom));
   font-size: 12px;
   text-align: center;
   color: var(--muted);
-}
-
-.tab-dock .brood-frame {
-  margin: 0;
-}
-
-.tab-dock .brood-canvas {
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.tab-dock .brood-status {
-  margin: 8px 12px calc(8px + env(safe-area-inset-bottom));
 }

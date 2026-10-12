@@ -1,6 +1,6 @@
 # dash-brood
 
-A [dash](../..) plugin. A mother squid lives in a phone-shaped panel on the right of dash. She is dash. Each running job hatches a small squid that swims near her, and she changes color and mood with the state of the queue.
+A [dash](../..) plugin. A mother squid lives in a panel on the right of dash. She is dash. Each running job hatches a small squid that swims near her, and she changes color and mood with the state of the queue.
 
 | In the panel | Means |
 |---|---|

@@ -45,7 +45,7 @@ The worker needs AWS credentials for Bedrock in the standard env chain, unless `
 
 A plugin is a Python package that registers a `dash.plugins` entry point. Install it next to dash, in the environment of both `dash serve` and `dash worker`, and it loads at startup. A plugin that fails to load is listed with its error in the Apps tab, and dash keeps running.
 
-[`examples/dash-brood`](examples/dash-brood) is a full example: a mother squid in a phone-shaped panel on the right, with one small squid for each running job.
+[`examples/dash-brood`](examples/dash-brood) is a full example: a mother squid in a panel on the right, with one small squid for each running job.
 
 ```sh
 uv pip install -e examples/dash-brood

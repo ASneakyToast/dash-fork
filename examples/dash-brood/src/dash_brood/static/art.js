@@ -1,7 +1,5 @@
 import { CHEER_MS, PEARL_MS, SETTLE_MS, SINK_MS, phase } from "./model.js";
 
-export const ASPECT = 9 / 19.5;
-
 const TAU = Math.PI * 2;
 const MOODS = {
   content: { hue: 268, sat: 58, light: 64, pulse: 0.8, eyes: "open", glow: 0.35, droop: 0 },
@@ -318,11 +316,5 @@ export function drawScene(ctx, scene) {
   const hits = placed.map((p) => ({ jobId: p.c.jobId, conversationId: p.c.conversationId, x: p.x, y: p.y, r: Math.max(p.size * 2.6, 28) }));
   const hovered = placed.find((p) => p.c.jobId === hover);
   if (hovered) drawLabel(ctx, labelFor(hovered.c), hovered.x, hovered.y + hovered.size * 2.2, w);
-  if (scene.framed) {
-    ctx.fillStyle = "#05070c";
-    ctx.beginPath();
-    ctx.roundRect(w * 0.36, h * 0.012, w * 0.28, h * 0.02, h * 0.01);
-    ctx.fill();
-  }
   return hits;
 }

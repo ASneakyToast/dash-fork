@@ -1,6 +1,6 @@
 # Writing a dash plugin
 
-A plugin is a Python package that dash finds at startup. It can add API routes, a tab or a side panel to the web UI, code that runs when dash starts, and a listener for what the worker does. [`examples/dash-brood`](../examples/dash-brood) is a complete one: a mother squid in a phone-shaped panel, with one small squid per running job.
+A plugin is a Python package that dash finds at startup. It can add API routes, a tab or a side panel to the web UI, code that runs when dash starts, and a listener for what the worker does. [`examples/dash-brood`](../examples/dash-brood) is a complete one: a mother squid in a side panel, with one small squid per running job.
 
 ## What a plugin can do
 
