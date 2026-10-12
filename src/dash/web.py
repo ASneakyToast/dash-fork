@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from dash.agents import Catalog
 from dash.config import Settings
 from dash.db import Memory, Store
 from dash.memory import Embedder
@@ -22,6 +23,14 @@ from dash.theme import Theme, load_overrides
 
 STATIC = Path(__file__).parent / "static"
 ENTRY_ID = re.compile(r"^\d+-\d+$")
+
+
+class NewConversation(BaseModel):
+    agent: str | None = Field(default=None, max_length=64)
+
+
+class PermissionChoice(BaseModel):
+    option_id: str | None = Field(default=None, max_length=200)
 
 
 class NewMessage(BaseModel):
@@ -57,9 +66,11 @@ def create_app(
     plugins: Plugins | None = None,
     overrides: Theme | None = None,
     lifespan: Callable[[FastAPI], AbstractAsyncContextManager[None]] | None = None,
+    catalog: Catalog | None = None,
 ) -> FastAPI:
     plugins = plugins or Plugins()
     themes = plugins.themes(overrides)
+    catalog = catalog or Catalog.parse("", environ={})
     ctx = Context("api", store, queue)
 
     @asynccontextmanager
@@ -84,22 +95,37 @@ def create_app(
     async def config() -> dict[str, Any]:
         return {"nango": nango.enabled, **(public or {})}
 
+    @app.get("/api/agents")
+    async def agents() -> dict[str, Any]:
+        return catalog.as_json()
+
     @app.get("/api/conversations")
     async def conversations() -> list[dict[str, Any]]:
         return [
-            {"id": str(c.id), "title": c.title, "updated_at": c.updated_at.isoformat()}
+            {
+                "id": str(c.id),
+                "title": c.title,
+                "agent": c.agent or catalog.default,
+                "session_id": c.session_id,
+                "updated_at": c.updated_at.isoformat(),
+            }
             for c in await store.conversations()
         ]
 
     @app.post("/api/conversations", status_code=201)
-    async def create_conversation() -> dict[str, str]:
-        conversation = await store.create_conversation()
-        return {"id": str(conversation.id), "title": conversation.title}
+    async def create_conversation(body: NewConversation | None = None) -> dict[str, str]:
+        agent = body.agent if body and body.agent else catalog.default
+        try:
+            catalog.spec(agent)
+        except KeyError as ex:
+            raise HTTPException(400, f"No agent named {agent!r}.") from ex
+        conversation = await store.create_conversation(agent=agent)
+        return {"id": str(conversation.id), "title": conversation.title, "agent": agent}
 
     @app.get("/api/conversations/{conversation_id}/messages")
     async def messages(conversation_id: uuid.UUID) -> list[dict[str, Any]]:
         return [
-            {"id": m.id, "role": m.role, "content": m.content}
+            {"id": m.id, "role": m.role, "content": m.content, "details": m.details or {}}
             for m in await store.messages(conversation_id)
         ]
 
@@ -128,6 +154,20 @@ def create_app(
         return StreamingResponse(
             stream(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no"}
         )
+
+    @app.post("/api/jobs/{job_id}/cancel", status_code=202)
+    async def cancel(job_id: str) -> dict[str, bool]:
+        if not job_id.isalnum():
+            raise HTTPException(400, "Bad job id.")
+        await queue.control(job_id, "cancel")
+        return {"ok": True}
+
+    @app.post("/api/jobs/{job_id}/permissions/{ask_id}", status_code=202)
+    async def permission(job_id: str, ask_id: str, body: PermissionChoice) -> dict[str, bool]:
+        if not (job_id.isalnum() and ask_id.isalnum()):
+            raise HTTPException(400, "Bad id.")
+        await queue.control(job_id, "permission", id=ask_id, option_id=body.option_id)
+        return {"ok": True}
 
     @app.get("/api/queue")
     async def queue_status() -> dict[str, int]:
@@ -221,6 +261,7 @@ def create_production_app() -> FastAPI:
     from dash.memory import memory_models
 
     settings = Settings.from_env()
+    catalog = Catalog.parse(settings.agents, settings.default_agent)
     plugins = discover(settings.plugins, settings.plugins_disabled)
     store = Store.from_url(settings.database_url)
     queue = Queue.from_url(settings.redis_url)
@@ -254,4 +295,5 @@ def create_production_app() -> FastAPI:
         plugins=plugins,
         overrides=load_overrides(settings.theme_overrides),
         lifespan=lifespan,
+        catalog=catalog,
     )

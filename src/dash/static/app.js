@@ -17,7 +17,15 @@ async function api(path, opts = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-const state = { conversation: null, config: {} };
+const state = {
+  conversation: null,
+  conversations: [],
+  config: {},
+  agents: { default: null, agents: [] },
+  job: null,
+  source: null,
+  sending: false,
+};
 const touch = matchMedia("(pointer: coarse)");
 
 $("#menu").addEventListener("click", () => {
@@ -53,17 +61,50 @@ tabHooks.apps = () => {
   loadPluginList();
 };
 
-// Conversations
+// Agents and conversations
+const IDLE = new Set(["done", "failed"]);
+
+function agentTitle(name) {
+  return state.agents.agents.find((a) => a.name === name)?.title ?? name ?? "";
+}
+
+async function loadAgents() {
+  state.agents = await api("/api/agents");
+  $("#agent").replaceChildren(
+    ...state.agents.agents.map((a) =>
+      el("option", { value: a.name, textContent: a.title, selected: a.name === state.agents.default }),
+    ),
+  );
+  $("#agent").hidden = state.agents.agents.length < 2;
+}
+
+function jobState(conversationId) {
+  const last = feed.events.findLast((e) => e.conversation_id === conversationId);
+  if (!last || IDLE.has(last.kind)) return null;
+  return { jobId: last.job_id, status: last.kind === "waiting" ? "waiting" : "running" };
+}
+
+function markStatus() {
+  document.querySelectorAll("#conversations li").forEach((li) => {
+    const job = jobState(li.dataset.id);
+    if (job) li.dataset.status = job.status;
+    else delete li.dataset.status;
+  });
+}
+
 async function loadConversations() {
   const list = await api("/api/conversations");
+  state.conversations = list;
   $("#conversations").replaceChildren(
     ...list.map((c) => {
-      const li = el("li", { textContent: c.title, title: c.title });
+      const li = el("li", { title: c.title }, c.title, el("span", { className: "meta", textContent: agentTitle(c.agent) }));
+      li.dataset.id = c.id;
       if (c.id === state.conversation) li.classList.add("active");
       li.addEventListener("click", () => openConversation(c.id));
       return li;
     }),
   );
+  markStatus();
   return list;
 }
 
@@ -74,26 +115,139 @@ function bubble(role, text) {
   return node;
 }
 
+function turnView(agent, text = "…") {
+  const steps = el("div", { className: "steps" });
+  const node = el("div", { className: "msg assistant", textContent: text });
+  $("#messages").append(el("div", { className: "agent-name", textContent: agentTitle(agent) }), steps, node);
+  node.scrollIntoView({ block: "end" });
+  return { steps, node, tools: new Map(), thought: null, plan: null };
+}
+
+function showTool(view, tool) {
+  let item = view.tools.get(tool.id);
+  if (!item) {
+    item = el("details", { className: "step tool" }, el("summary"), el("pre"));
+    view.tools.set(tool.id, item);
+    view.steps.append(item);
+  }
+  item.dataset.status = tool.status;
+  const where = tool.paths?.length ? ` · ${tool.paths.join(", ")}` : "";
+  item.querySelector("summary").textContent = `${tool.title}${where}`;
+  item.querySelector("pre").textContent = tool.detail || "";
+  item.querySelector("pre").hidden = !tool.detail;
+}
+
+function showThought(view, text) {
+  if (!view.thought) {
+    view.thought = el("details", { className: "step thought" }, el("summary", { textContent: "Thinking" }), el("pre"));
+    view.steps.prepend(view.thought);
+  }
+  view.thought.querySelector("pre").textContent += text;
+}
+
+function showPlan(view, entries) {
+  if (!view.plan) {
+    view.plan = el("details", { className: "step plan", open: true }, el("summary", { textContent: "Plan" }), el("ul"));
+    view.steps.prepend(view.plan);
+  }
+  view.plan.querySelector("ul").replaceChildren(
+    ...entries.map((e) => {
+      const li = el("li", { textContent: e.content });
+      li.dataset.status = e.status;
+      return li;
+    }),
+  );
+}
+
+function showPermission(view, jobId, ask) {
+  const choices = ask.options.map((o) => {
+    const button = el("button", { type: "button", textContent: o.name });
+    button.addEventListener("click", () =>
+      api(`/api/jobs/${jobId}/permissions/${ask.id}`, { method: "POST", body: { option_id: o.id } }),
+    );
+    return button;
+  });
+  const box = el("div", { className: "permission" }, el("div", { textContent: ask.title }), el("div", { className: "choices" }, ...choices));
+  box.dataset.id = ask.id;
+  box.dataset.options = JSON.stringify(ask.options);
+  view.node.before(box);
+  box.scrollIntoView({ block: "end" });
+}
+
+function answerPermission(ev) {
+  const box = document.querySelector(`.permission[data-id="${ev.id}"]`);
+  if (!box) return;
+  const chosen = JSON.parse(box.dataset.options).find((o) => o.id === ev.option_id);
+  box.dataset.answered = "";
+  box.append(el("div", { className: "meta", textContent: chosen ? `Answered: ${chosen.name}` : "Not allowed" }));
+}
+
+function renderMessage(m) {
+  if (m.role !== "assistant") return bubble(m.role, m.content);
+  const d = m.details || {};
+  const view = turnView(d.agent, m.content || (d.stop === "cancelled" ? "(stopped)" : ""));
+  if (d.thoughts) showThought(view, d.thoughts);
+  if (d.plan) showPlan(view, d.plan);
+  (d.tools || []).forEach((t) => showTool(view, t));
+  (d.permissions || []).forEach((ask) => {
+    showPermission(view, null, ask);
+    answerPermission(ask);
+  });
+  if (d.stop === "cancelled" && m.content) view.node.append(el("div", { className: "meta", textContent: "(stopped)" }));
+  return view.node;
+}
+
+function current() {
+  return state.conversations.find((c) => c.id === state.conversation);
+}
+
 async function openConversation(id) {
+  state.source?.close();
   state.conversation = id;
   localStorage.setItem("conversation", id);
   closeMenu();
   const messages = await api(`/api/conversations/${id}/messages`);
   $("#messages").replaceChildren();
-  messages.forEach((m) => bubble(m.role, m.content));
-  loadConversations();
+  messages.forEach(renderMessage);
+  await loadConversations();
+  $("#input").placeholder = `Message ${agentTitle(current()?.agent) || "the agent"}…`;
+  attach();
+}
+
+function attach() {
+  const job = state.conversation && jobState(state.conversation);
+  if (job && !state.sending && state.job !== job.jobId) follow(job.jobId, turnView(current()?.agent));
+}
+
+let attachTimer;
+function attachSoon() {
+  clearTimeout(attachTimer);
+  attachTimer = setTimeout(attach, 300);
 }
 
 $("#new-chat").addEventListener("click", async () => {
-  const c = await api("/api/conversations", { method: "POST" });
+  const c = await api("/api/conversations", { method: "POST", body: { agent: $("#agent").value || null } });
   await openConversation(c.id);
   $("#input").focus();
 });
 
 // Sending and streaming
-function follow(jobId, node) {
+function finish(source) {
+  source.close();
+  if (state.source === source) {
+    state.source = null;
+    state.job = null;
+    $("#stop").hidden = true;
+  }
+}
+
+function follow(jobId, view) {
+  state.source?.close();
+  const { node } = view;
   return new Promise((resolve) => {
     const source = new EventSource(`/api/jobs/${jobId}/events`);
+    Object.assign(state, { source, job: jobId });
+    $("#stop").hidden = false;
     let text = "";
     source.onmessage = (e) => {
       const ev = JSON.parse(e.data);
@@ -101,41 +255,63 @@ function follow(jobId, node) {
         text += ev.text;
         node.textContent = text;
         node.scrollIntoView({ block: "end" });
+      } else if (ev.kind === "thought") {
+        showThought(view, ev.text);
+      } else if (ev.kind === "tool") {
+        showTool(view, ev.tool);
+      } else if (ev.kind === "plan") {
+        showPlan(view, ev.entries);
+      } else if (ev.kind === "permission") {
+        showPermission(view, jobId, ev);
+      } else if (ev.kind === "permission_done") {
+        answerPermission(ev);
       } else if (ev.kind === "memories") {
         node.after(el("div", { className: "recalled", textContent: `Recalled ${ev.items.length} memories` }));
       } else if (ev.kind === "done" || ev.kind === "error") {
         if (ev.kind === "error") {
           node.classList.add("error");
           node.textContent = text + `\n\n${ev.message}`;
+        } else if (ev.stop === "cancelled") {
+          node.textContent = text || "(stopped)";
         }
-        source.close();
+        finish(source);
         resolve();
       }
     };
   });
 }
 
+$("#stop").addEventListener("click", async () => {
+  if (state.job) await api(`/api/jobs/${state.job}/cancel`, { method: "POST" });
+});
+
 $("#composer").addEventListener("submit", async (e) => {
   e.preventDefault();
   const content = $("#input").value.trim();
   if (!content) return;
   if (!state.conversation) {
-    const c = await api("/api/conversations", { method: "POST" });
+    const c = await api("/api/conversations", { method: "POST", body: { agent: $("#agent").value || null } });
     state.conversation = c.id;
+    await loadConversations();
   }
   $("#input").value = "";
   bubble("user", content);
-  const node = bubble("assistant", "…");
+  const view = turnView(current()?.agent);
+  state.sending = true;
   try {
     const { job_id } = await api(`/api/conversations/${state.conversation}/messages`, {
       method: "POST",
       body: { content },
     });
     loadConversations();
-    await follow(job_id, node);
+    const done = follow(job_id, view);
+    state.sending = false;
+    await done;
   } catch (err) {
-    node.classList.add("error");
-    node.textContent = String(err);
+    view.node.classList.add("error");
+    view.node.textContent = String(err);
+  } finally {
+    state.sending = false;
   }
 });
 
@@ -259,6 +435,8 @@ function startFeed() {
   source.onmessage = (e) => {
     const event = JSON.parse(e.data);
     feed.events = [...feed.events, event].slice(-FEED_LIMIT);
+    markStatus();
+    if (event.conversation_id === state.conversation) attachSoon();
     feed.listeners.forEach((fn) => fn(event));
   };
 }
@@ -413,11 +591,12 @@ const theme = createTheme({
   storage: localStorage,
 });
 renderAppearance();
+await loadAgents();
 const list = await loadConversations();
+startFeed();
 const last = localStorage.getItem("conversation");
 if (last && list.some((c) => c.id === last)) openConversation(last);
 if (location.hash === "#apps") document.querySelector('nav button[data-tab="apps"]').click();
 pollQueue();
 setInterval(pollQueue, 5000);
-startFeed();
 loadPlugins();

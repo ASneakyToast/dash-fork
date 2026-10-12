@@ -27,7 +27,10 @@
       <button data-tab="apps">Apps</button>
     </nav>
     <div id="sidebar-chats">
-      <button id="new-chat">+ New conversation</button>
+      <div id="new-chat-row">
+        <select id="agent" aria-label="Agent for a new conversation"></select>
+        <button id="new-chat">+ New</button>
+      </div>
       <ul id="conversations"></ul>
     </div>
   </aside>
@@ -36,7 +39,8 @@
     <section id="tab-chat" class="tab active">
       <div id="messages"></div>
       <form id="composer">
-        <textarea id="input" rows="3" placeholder="Message hermes…"></textarea>
+        <textarea id="input" rows="3" placeholder="Message the agent…"></textarea>
+        <button type="button" id="stop" hidden>Stop</button>
         <button type="submit">Send</button>
       </form>
     </section>

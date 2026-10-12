@@ -39,6 +39,14 @@
         "danger": {
           "$type": "color",
           "$value": "#a00000"
+        },
+        "warning": {
+          "$type": "color",
+          "$value": "#7a3e00"
+        },
+        "success": {
+          "$type": "color",
+          "$value": "#005a00"
         }
       }
     }
@@ -81,6 +89,14 @@
         "danger": {
           "$type": "color",
           "$value": "#ff8080"
+        },
+        "warning": {
+          "$type": "color",
+          "$value": "#ffd24d"
+        },
+        "success": {
+          "$type": "color",
+          "$value": "#7dff7d"
         }
       }
     }

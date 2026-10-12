@@ -11,10 +11,28 @@ button:hover { border-color: var(--dash-color-accent); }
 nav button.active { background: var(--dash-color-accent); color: var(--dash-color-on-accent); border-color: var(--dash-color-accent); }
 #sidebar-chats { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 #menu { display: none; }
-#new-chat { margin: 0 10px 8px; }
+#new-chat-row { display: flex; gap: 6px; margin: 0 10px 8px; }
+#new-chat-row select { flex: 1; min-width: 0; font: inherit; padding: 6px; border: 1px solid var(--dash-color-border); border-radius: var(--dash-radius-control); background: var(--dash-color-surface); color: var(--dash-color-text); }
 ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 #conversations li { padding: 8px 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #conversations li.active, #conversations li:hover { background: var(--dash-color-bg); }
+#conversations li .meta { display: block; overflow: hidden; text-overflow: ellipsis; }
+#conversations li[data-status="running"] .meta::after { content: " · running"; color: var(--dash-color-accent); }
+#conversations li[data-status="waiting"] .meta::after { content: " · needs you"; color: var(--dash-color-warning); font-weight: 600; }
+.agent-name { font-size: 12px; color: var(--dash-color-text-muted); align-self: flex-start; margin-bottom: -6px; }
+.steps { align-self: flex-start; max-width: 760px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.steps:empty { display: none; }
+.step { border: 1px solid var(--dash-color-border); border-radius: var(--dash-radius-control); padding: 4px 10px; background: var(--dash-color-surface); }
+.step summary { cursor: pointer; overflow-wrap: anywhere; }
+.step pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; color: var(--dash-color-text-muted); max-height: 240px; overflow-y: auto; }
+.step[data-status="completed"] summary::before { content: "✓ "; color: var(--dash-color-success); }
+.step[data-status="failed"] summary::before { content: "✗ "; color: var(--dash-color-danger); }
+.step[data-status="in_progress"] summary::before, .step[data-status="pending"] summary::before { content: "… "; color: var(--dash-color-accent); }
+.step.thought summary, .step.plan summary { color: var(--dash-color-text-muted); }
+.step.plan li[data-status="completed"] { text-decoration: line-through; color: var(--dash-color-text-muted); }
+.permission { align-self: flex-start; max-width: 760px; border: 1px solid var(--dash-color-warning); border-radius: var(--dash-radius-bubble); padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+.permission .choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.permission[data-answered] .choices { display: none; }
 main { flex: 1; display: flex; min-width: 0; min-height: 0; }
 .tab { display: none; flex: 1; flex-direction: column; padding: 16px; gap: 12px; min-width: 0; }
 .tab.active { display: flex; }
@@ -48,7 +66,7 @@ h2 { font-size: 16px; margin: 12px 0 0; }
   button { min-height: 44px; }
   #sidebar-chats { display: none; max-height: 45dvh; }
   aside.open #sidebar-chats { display: flex; }
-  #new-chat { margin: 0 12px 8px; }
+  #new-chat-row { margin: 0 12px 8px; }
   #conversations li { padding: 12px 14px; }
   .tab { padding: 12px; overflow-y: auto; }
   #tab-chat { overflow-y: visible; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }

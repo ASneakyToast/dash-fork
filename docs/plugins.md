@@ -104,7 +104,10 @@ The worker publishes a state change to the capped Redis stream `dash:activity` a
 |---|---|---|
 | `started` | `{}` | The worker picked the job up. |
 | `recalled` | `{"count": n}` | Memories were found for the message. |
-| `done` | `{}` | The reply is saved. |
+| `waiting` | `{"title": "…"}` | The agent asked permission to run a tool. The job waits for the user. |
+| `answered` | `{"option_id": "…"}` | The user answered. `null` means not allowed. |
+| `cancelling` | `{}` | The user pressed Stop. |
+| `done` | `{"stop": "…"}` | The reply is saved. `stop` is the ACP stop reason, such as `end_turn` or `cancelled`. |
 | `failed` | `{"message": "…"}` | The job could not be answered. |
 | `remembered` | `{"count": n}` | New memories were stored after the reply. |
 

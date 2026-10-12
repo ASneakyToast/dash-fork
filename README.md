@@ -1,12 +1,13 @@
 # dash
 
-An always-on assistant in front of [hermes-agent](https://github.com/whatever/geometry.dev/tree/main/apps/hermes-agent).
+An always-on assistant in front of [hermes-agent](https://github.com/whatever/geometry.dev/tree/main/apps/hermes-agent), or any agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com) (ACP).
 
 | Part | What it does |
 |---|---|
 | Web UI (`src/dash/static`) | Chat, memories (list, search, add, delete), connected apps, and queue status. No build step. |
 | API (`dash serve`) | FastAPI. Stores each user message, then adds a job to the Redis stream `dash:jobs`. |
-| Worker (`dash worker`) | Reads `dash:jobs`, recalls memories from pgvector, and streams the hermes reply. Then it extracts new memories. |
+| Worker (`dash worker`) | Reads `dash:jobs`, recalls memories from pgvector, and streams the reply from the conversation's agent. Then it extracts new memories. |
+| Agents (`src/dash/agents.py`) | Each conversation is bound to one agent: hermes's OpenAI-compatible API, or an ACP agent over stdio or a WebSocket, with its tool calls, plan, permission questions and Stop. See [docs/agents.md](docs/agents.md). |
 | Memories | Postgres + pgvector. Bedrock Titan v2 makes the embeddings. Bedrock Haiku extracts the facts. Set `MEMORY_BASE_URL` to use an OpenAI-compatible API (LiteLLM, OpenRouter) instead. |
 | App keys | A self-hosted [Nango](https://nango.dev). Nango holds the OAuth tokens. dash and hermes ask Nango for them. |
 | Plugins (`src/dash/plugins.py`) | Python packages that add routes, UI tabs or a side panel, and listeners for what the worker does. See [docs/plugins.md](docs/plugins.md). |
@@ -77,6 +78,8 @@ dash stores the private key and secrets as plain JSONB. Protect the database.
 | `NANGO_PUBLIC_URL`, `NANGO_CONNECT_URL` | Browser-facing Nango API and Connect UI addresses |
 | `EMBED_MODEL`, `EXTRACT_MODEL`, `MEMORY_TOP_K` | Titan v2, Haiku 4.5, `8` |
 | `MEMORY_BASE_URL`, `MEMORY_API_KEY` | Empty (Bedrock). An OpenAI-compatible `/v1` URL and its key. The embedding model must accept `dimensions: 1024`. |
+| `DASH_AGENTS`, `DASH_DEFAULT_AGENT` | Empty: one `hermes` agent over `HERMES_*`. A JSON object of agents, and the one new conversations use. See [docs/agents.md](docs/agents.md). |
+| `DASH_WORKER_CONCURRENCY` | `4`. Jobs one worker runs at once. Jobs of one conversation always run in order. |
 | `DASH_PLUGINS` | Comma-separated `module:attribute` plugins to load without installing them. Empty by default. |
 | `DASH_PLUGINS_DISABLED` | Comma-separated plugin entry point names to skip. Empty by default. |
 | `DASH_THEME_OVERRIDES` | Path to a JSON file of design token overrides, applied on top of every theme. See `docs/theming.md`. Empty by default. |

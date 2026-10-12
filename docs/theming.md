@@ -44,6 +44,8 @@ These names are part of the plugin API. A token is never renamed or removed with
 | `dash.color.on-accent` | `--dash-color-on-accent` | | Text on an accent background. |
 | `dash.color.bubble-user` | `--dash-color-bubble-user` | `--user` | The user's own messages. |
 | `dash.color.danger` | `--dash-color-danger` | | Errors. |
+| `dash.color.warning` | `--dash-color-warning` | | Something that waits for the user, such as a permission question. |
+| `dash.color.success` | `--dash-color-success` | | A finished step, such as a completed tool call. |
 | `dash.radius.control` | `--dash-radius-control` | | Buttons and inputs. |
 | `dash.radius.bubble` | `--dash-radius-bubble` | | Message bubbles. |
 | `dash.font.family` | `--dash-font-family` | | The body font stack. |

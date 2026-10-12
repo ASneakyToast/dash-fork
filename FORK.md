@@ -55,8 +55,7 @@ Never in a topic branch:
 | Mobile UI | `feat/mobile-layout` | **Duplicate:** the fork line has its own commit (`0d32b73`). |
 | Plugin system + dash-brood | `claude/dash-plugin-system-ue2bwa` | **Duplicate:** the fork line has its own commits. |
 | Theming | `claude/dash-theming` | **Duplicate:** the fork line merged PR #6, a port onto the fork line. |
-
-Not in `joel-dash/main` on purpose: `joel-dash/acp` (ACP agents).
+| ACP agents | none yet | Merged from `joel-dash/acp`. Built on the plugin system and theming, so a clean branch for Matt waits on those. Spec: `openspec/changes/acp-agent-sessions/`. |
 
 **Duplicates collapse on upstream merge.** When a topic branch lands in `whatever/dash`, refresh `main`, merge `upstream/main` into `joel-dash/main` (rule 5), and expect conflicts where the fork's copy differs. Resolve toward upstream's version unless the fork copy adds something.
 
