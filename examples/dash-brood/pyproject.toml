@@ -1,0 +1,17 @@
+[project]
+name = "dash-brood"
+version = "0.1.0"
+description = "A dash plugin: a mother squid and her brood show what dash is doing."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = ["dash"]
+
+[project.entry-points."dash.plugins"]
+brood = "dash_brood:plugin"
+
+[tool.uv.sources]
+dash = { path = "../..", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

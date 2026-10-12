@@ -17,6 +17,7 @@ from dash.memory import (
     Extractor,
     system_prompt,
 )
+from dash.plugins import Context, Plugins
 from dash.queue import Job, Queue
 
 log = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class Worker:
         embedder: Embedder,
         extractor: Extractor,
         top_k: int,
+        plugins: Plugins | None = None,
     ) -> None:
         self.store = store
         self.queue = queue
@@ -47,7 +49,18 @@ class Worker:
         self.embedder = embedder
         self.extractor = extractor
         self.top_k = top_k
+        self.plugins = plugins or Plugins()
+        self.ctx = Context("worker", store, queue)
         self.name = f"{socket.gethostname()}-{uuid.uuid4().hex[:6]}"
+
+    async def note(self, kind: str, job: Job, **data: object) -> None:
+        """Publish a state change of the job to the activity feed and the plugins."""
+        try:
+            activity = await self.queue.publish(kind, job, **data)
+        except RedisError:
+            log.exception("activity publish failed")
+            return
+        await self.plugins.dispatch(self.ctx, activity)
 
     async def recall(self, text: str) -> list[str]:
         try:
@@ -73,15 +86,18 @@ class Worker:
         return stored
 
     async def handle(self, job: Job) -> None:
+        await self.note("started", job)
         conversation_id = uuid.UUID(job.conversation_id)
         history = await self.store.messages(conversation_id)
         if not history or history[-1].role != "user":
             await self.queue.emit(job.job_id, "error", message="No user message to answer.")
+            await self.note("failed", job, message="No user message to answer.")
             return
         user_text = history[-1].content
         memories = await self.recall(user_text)
         if memories:
             await self.queue.emit(job.job_id, "memories", items=memories)
+            await self.note("recalled", job, count=len(memories))
 
         messages: list[dict[str, str]] = []
         system = system_prompt(memories)
@@ -101,6 +117,7 @@ class Worker:
         except Exception as ex:
             log.exception("hermes call failed")
             await self.queue.emit(job.job_id, "error", message=f"hermes: {ex}")
+            await self.note("failed", job, message=f"hermes: {ex}")
             return
         if buffer:
             await self.queue.emit(job.job_id, "delta", text=buffer)
@@ -108,9 +125,11 @@ class Worker:
         text = "".join(reply)
         message = await self.store.add_message(conversation_id, "assistant", text)
         await self.queue.emit(job.job_id, "done", message_id=message.id)
+        await self.note("done", job)
         stored = await self.remember(user_text, text)
         if stored:
             log.info("stored %d new memories", stored)
+            await self.note("remembered", job, count=stored)
 
     async def run(self, stop: asyncio.Event | None = None) -> None:
         await self.queue.ensure_group()
@@ -129,4 +148,5 @@ class Worker:
             except Exception as ex:
                 log.exception("job %s failed", job.job_id)
                 await self.queue.emit(job.job_id, "error", message=str(ex))
+                await self.note("failed", job, message=str(ex))
             await self.queue.ack(job)
