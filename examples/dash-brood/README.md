@@ -19,6 +19,10 @@ uv pip install -e examples/dash-brood
 uv run dash serve
 ```
 
+On a phone, or any screen under 900 px wide, the panel is a **Brood** tab instead of a side panel.
+
+To bake it into the Docker image, build with `--build-arg PLUGINS=./examples/dash-brood`.
+
 Or without installing: `PYTHONPATH=examples/dash-brood/src DASH_PLUGINS=dash_brood:plugin uv run dash serve`.
 
 `dash worker` loads the same plugin, so install it in both processes.

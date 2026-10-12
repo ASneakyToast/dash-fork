@@ -113,7 +113,7 @@ An `Activity` also has `id`, `job_id`, `conversation_id` and `at` (Unix seconds)
 | Member | Does |
 |---|---|
 | `dash.addTab({id, title, mount(root)})` | Adds a tab. `mount` runs the first time it opens. |
-| `dash.addDock({id, title, mount(root)})` | Mounts a panel in the permanent right-hand dock. The dock shows once a plugin adds one, and hides under 900 px wide. |
+| `dash.addDock({id, title, mount(root)})` | Mounts a panel in the permanent right-hand dock. The dock shows once a plugin adds one. Under 900 px wide the panel moves to a tab with the same title, so it works on a phone too. |
 | `dash.onActivity(fn)` | Calls `fn` with each activity event, starting with the recent ones the page already has. Returns an unsubscribe function. |
 | `dash.openConversation(id)` | Switches to Chat and opens the conversation. |
 | `dash.conversations()` | Returns the conversation list. |
@@ -122,6 +122,16 @@ An `Activity` also has `id`, `job_id`, `conversation_id` and `at` (Unix seconds)
 | `dash.el(tag, props, ...children)`, `dash.config` | A small DOM helper, and the server config. |
 
 Tab and dock ids are prefixed with the plugin name, so ids never clash. A callback that throws is caught and logged to the console under the plugin's name. A plugin whose script fails to load shows as an error in the Apps tab, and the rest of the UI keeps working.
+
+## Putting a plugin in the Docker image
+
+The image only has what is installed in it. Pass plugin paths or package names as the `PLUGINS` build argument, and they are installed into the image's virtual environment:
+
+```sh
+docker build --build-arg PLUGINS=./examples/dash-brood -t dash .
+```
+
+`dash serve` and `dash worker` run from the same image, so both load the plugin. With no argument, nothing extra is installed.
 
 ## Testing a plugin
 

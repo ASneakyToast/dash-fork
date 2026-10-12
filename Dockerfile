@@ -28,6 +28,11 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable
 
+ARG PLUGINS=""
+COPY examples ./examples
+RUN --mount=type=cache,target=/root/.cache/uv \
+    if [ -n "$PLUGINS" ]; then uv pip install --python /app/.venv/bin/python --no-deps $PLUGINS; fi
+
 
 # Stage 2: runtime. No uv, no build tools, no source, not root.
 FROM python:3.13.13-slim-trixie
