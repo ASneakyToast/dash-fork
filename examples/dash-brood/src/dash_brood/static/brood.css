@@ -14,5 +14,5 @@
   margin: 8px 12px calc(8px + env(safe-area-inset-bottom));
   font-size: 12px;
   text-align: center;
-  color: var(--muted);
+  color: var(--dash-color-text-muted);
 }

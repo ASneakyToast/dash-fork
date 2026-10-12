@@ -1,13 +1,17 @@
 import { CHEER_MS, PEARL_MS, SETTLE_MS, SINK_MS, phase } from "./model.js";
+import { alpha, darker, lighter } from "./palette.js";
 
 const TAU = Math.PI * 2;
+const JOB = { sat: 66, light: 66 };
+const SUNK = { sat: 8, light: 48 };
 const MOODS = {
-  content: { hue: 268, sat: 58, light: 64, pulse: 0.8, eyes: "open", glow: 0.35, droop: 0 },
-  busy: { hue: 188, sat: 72, light: 62, pulse: 2, eyes: "wide", glow: 0.6, droop: 0 },
-  strained: { hue: 24, sat: 82, light: 62, pulse: 3.4, eyes: "wide", glow: 0.5, droop: 0 },
-  sick: { hue: 96, sat: 30, light: 54, pulse: 0.5, eyes: "dizzy", glow: 0.1, droop: 1 },
-  asleep: { hue: 250, sat: 26, light: 40, pulse: 0.3, eyes: "closed", glow: 0.05, droop: 0.6 },
+  content: { pulse: 0.8, eyes: "open", glow: 0.35, droop: 0 },
+  busy: { pulse: 2, eyes: "wide", glow: 0.6, droop: 0 },
+  strained: { pulse: 3.4, eyes: "wide", glow: 0.5, droop: 0 },
+  sick: { pulse: 0.5, eyes: "dizzy", glow: 0.1, droop: 1 },
+  asleep: { pulse: 0.3, eyes: "closed", glow: 0.05, droop: 0.6 },
 };
+const hsl = (hue, sat, light) => `hsl(${hue} ${sat}% ${light}%)`;
 const SPOTS = [
   [-0.35, -1.0, 0.12],
   [0.3, -0.8, 0.09],
@@ -28,12 +32,12 @@ export function hash(text, salt = "") {
   return (h >>> 0) / 2 ** 32;
 }
 
-function drawEyes(ctx, kind, look) {
+function drawEyes(ctx, kind, look, p) {
   [-0.42, 0.42].forEach((x) => {
     ctx.save();
     ctx.translate(x, -0.05);
     ctx.lineCap = "round";
-    ctx.strokeStyle = "#0d0a1a";
+    ctx.strokeStyle = p.ink;
     ctx.lineWidth = 0.07;
     ctx.beginPath();
     if (kind === "happy") {
@@ -56,15 +60,15 @@ function drawEyes(ctx, kind, look) {
       ctx.stroke();
     } else {
       const r = kind === "wide" ? 0.26 : 0.2;
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = p.sclera;
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, TAU);
       ctx.fill();
-      ctx.fillStyle = "#0d0a1a";
+      ctx.fillStyle = p.ink;
       ctx.beginPath();
       ctx.arc(look[0] * 0.07, look[1] * 0.07, r * 0.52, 0, TAU);
       ctx.fill();
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = p.sclera;
       ctx.beginPath();
       ctx.arc(look[0] * 0.07 - r * 0.15, look[1] * 0.07 - r * 0.18, r * 0.16, 0, TAU);
       ctx.fill();
@@ -75,7 +79,7 @@ function drawEyes(ctx, kind, look) {
 
 function drawTentacles(ctx, o) {
   ctx.lineCap = "round";
-  ctx.strokeStyle = `hsl(${o.hue} ${o.sat}% ${o.light - 8}%)`;
+  ctx.strokeStyle = darker(o.color, 15);
   Array.from({ length: o.tentacles }, (_, i) => {
     const spread = (i - (o.tentacles - 1) / 2) / ((o.tentacles - 1) / 2 || 1);
     const points = Array.from({ length: 9 }, (_, j) => {
@@ -94,7 +98,7 @@ function drawTentacles(ctx, o) {
 }
 
 export function drawSquid(ctx, o) {
-  const s = { hue: 268, sat: 60, light: 62, eyes: "open", tentacles: 4, droop: 0, tilt: 0, alpha: 1, glow: 0.3, pulse: 1, look: [0, 0], length: 1, ...o };
+  const s = { eyes: "open", tentacles: 4, droop: 0, tilt: 0, alpha: 1, glow: 0.3, pulse: 1, look: [0, 0], length: 1, ...o };
   ctx.save();
   ctx.globalAlpha = s.alpha;
   ctx.translate(s.x, s.y);
@@ -102,23 +106,23 @@ export function drawSquid(ctx, o) {
   ctx.scale(s.size, s.size * (1 + Math.sin(s.t * s.pulse * 2) * 0.035));
   if (s.glow > 0) {
     const halo = ctx.createRadialGradient(0, -0.6, 0.3, 0, -0.6, 2.6);
-    halo.addColorStop(0, `hsla(${s.hue} ${s.sat}% ${s.light}% / ${s.glow})`);
-    halo.addColorStop(1, `hsla(${s.hue} ${s.sat}% ${s.light}% / 0)`);
+    halo.addColorStop(0, alpha(s.color, s.glow));
+    halo.addColorStop(1, alpha(s.color, 0));
     ctx.fillStyle = halo;
     ctx.beginPath();
     ctx.arc(0, -0.6, 2.6, 0, TAU);
     ctx.fill();
   }
   drawTentacles(ctx, s);
-  ctx.fillStyle = `hsl(${s.hue} ${s.sat}% ${s.light - 10}%)`;
+  ctx.fillStyle = darker(s.color, 18);
   [-1, 1].forEach((side) => {
     ctx.beginPath();
     ctx.ellipse(side * 0.62, -1.2, 0.42, 0.22, side * 0.9, 0, TAU);
     ctx.fill();
   });
   const body = ctx.createLinearGradient(0, -1.75, 0, 0.62);
-  body.addColorStop(0, `hsl(${s.hue} ${s.sat}% ${s.light + 12}%)`);
-  body.addColorStop(1, `hsl(${s.hue} ${s.sat}% ${s.light - 14}%)`);
+  body.addColorStop(0, lighter(s.color, 30));
+  body.addColorStop(1, darker(s.color, 25));
   ctx.fillStyle = body;
   ctx.beginPath();
   ctx.moveTo(0, -1.75);
@@ -128,27 +132,27 @@ export function drawSquid(ctx, o) {
   ctx.bezierCurveTo(-0.95, -0.7, -0.55, -1.5, 0, -1.75);
   ctx.fill();
   SPOTS.forEach(([x, y, r], k) => {
-    ctx.fillStyle = `hsl(${s.hue + 30} ${s.sat}% ${s.light - 25}% / ${0.35 + 0.2 * Math.sin(s.t * s.pulse * 2 + k)})`;
+    ctx.fillStyle = alpha(darker(s.color, 45), 0.35 + 0.2 * Math.sin(s.t * s.pulse * 2 + k));
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
   });
-  drawEyes(ctx, s.eyes, s.look);
+  drawEyes(ctx, s.eyes, s.look, s.palette);
   ctx.restore();
 }
 
-function drawBackground(ctx, w, h, t) {
+function drawBackground(ctx, w, h, t, p) {
   const water = ctx.createLinearGradient(0, 0, 0, h);
-  water.addColorStop(0, "#134069");
-  water.addColorStop(0.5, "#0a1f3d");
-  water.addColorStop(1, "#040a16");
+  water.addColorStop(0, p.waterTop);
+  water.addColorStop(0.5, p.waterMid);
+  water.addColorStop(1, p.waterDeep);
   ctx.fillStyle = water;
   ctx.fillRect(0, 0, w, h);
   [0, 1, 2].forEach((k) => {
     const x = w * (0.2 + 0.3 * k) + Math.sin(t * 0.15 + k * 2) * w * 0.05;
     const shaft = ctx.createLinearGradient(0, 0, 0, h * 0.8);
-    shaft.addColorStop(0, "rgba(170, 225, 255, 0.13)");
-    shaft.addColorStop(1, "rgba(170, 225, 255, 0)");
+    shaft.addColorStop(0, alpha(p.light, 0.13));
+    shaft.addColorStop(1, alpha(p.light, 0));
     ctx.fillStyle = shaft;
     ctx.beginPath();
     ctx.moveTo(x - w * 0.04, 0);
@@ -161,16 +165,16 @@ function drawBackground(ctx, w, h, t) {
     const speed = 3 + hash(i, "v") * 6;
     const x = hash(i, "x") * w + Math.sin(t * 0.3 + i) * 8;
     const y = (hash(i, "y") * h + t * speed) % h;
-    ctx.fillStyle = `rgba(210, 235, 255, ${0.12 + hash(i, "a") * 0.2})`;
+    ctx.fillStyle = alpha(p.light, 0.12 + hash(i, "a") * 0.2);
     ctx.beginPath();
     ctx.arc(x, y, 0.6 + hash(i, "r") * 1.1, 0, TAU);
     ctx.fill();
   });
 }
 
-function drawFloor(ctx, w, h, t) {
+function drawFloor(ctx, w, h, t, p) {
   [0.06, 0.14, 0.87, 0.95].forEach((fx, k) => {
-    ctx.strokeStyle = "#134a47";
+    ctx.strokeStyle = p.weed;
     ctx.lineWidth = 4;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -181,7 +185,7 @@ function drawFloor(ctx, w, h, t) {
     });
     ctx.stroke();
   });
-  ctx.fillStyle = "#0b1423";
+  ctx.fillStyle = p.floor;
   ctx.beginPath();
   ctx.moveTo(0, h);
   ctx.lineTo(0, h * 0.92);
@@ -191,20 +195,20 @@ function drawFloor(ctx, w, h, t) {
   ctx.fill();
 }
 
-function drawEgg(ctx, x, y, r, t, i) {
+function drawEgg(ctx, x, y, r, t, i, p) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(Math.sin(t * 1.6 + i) * 0.12);
   const halo = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 2.4);
-  halo.addColorStop(0, "rgba(255, 220, 240, 0.35)");
-  halo.addColorStop(1, "rgba(255, 220, 240, 0)");
+  halo.addColorStop(0, alpha(p.eggShell, 0.35));
+  halo.addColorStop(1, alpha(p.eggShell, 0));
   ctx.fillStyle = halo;
   ctx.beginPath();
   ctx.arc(0, 0, r * 2.4, 0, TAU);
   ctx.fill();
   const shell = ctx.createRadialGradient(-r * 0.3, -r * 0.4, r * 0.1, 0, 0, r * 1.3);
-  shell.addColorStop(0, "#fff7fb");
-  shell.addColorStop(1, "#d9a8c9");
+  shell.addColorStop(0, p.eggShell);
+  shell.addColorStop(1, p.eggShade);
   ctx.fillStyle = shell;
   ctx.beginPath();
   ctx.ellipse(0, 0, r * 0.8, r, 0, 0, TAU);
@@ -232,7 +236,7 @@ function place(c, now, t, w, h, mother) {
   const birth = ease((now - c.born) / 1200);
   const look = [Math.cos(t * 0.9 + a * TAU), Math.sin(t * 0.7 + b * TAU)];
   const hue = 170 + a * 160;
-  const lively = { hue, sat: 66, light: 66, glow: 0.25, pulse: 1.4 + b, look, size: size * (0.3 + 0.7 * birth) };
+  const lively = { color: hsl(hue, JOB.sat, JOB.light), glow: 0.25, pulse: 1.4 + b, look, size: size * (0.3 + 0.7 * birth) };
   const kind = phase(c, now);
   const places = {
     swimming: () => ({ ...mix(mother.base, orbit, birth), ...lively }),
@@ -253,42 +257,42 @@ function place(c, now, t, w, h, mother) {
     resting: () => ({ ...floor, ...lively, eyes: "closed", glow: 0.1, pulse: 0.5, tilt: (b - 0.5) * 0.4, size }),
     sinking: () => {
       const u = ease(age / SINK_MS);
-      return { ...mix(orbit, floor, u), ...lively, sat: lerp(66, 8, u), light: lerp(66, 48, u), glow: 0, eyes: "x", tilt: u * Math.PI, alpha: 0.85, size };
+      return { ...mix(orbit, floor, u), ...lively, color: hsl(hue, lerp(JOB.sat, SUNK.sat, u), lerp(JOB.light, SUNK.light, u)), glow: 0, eyes: "x", tilt: u * Math.PI, alpha: 0.85, size };
     },
-    sunk: () => ({ ...floor, ...lively, sat: 8, light: 48, glow: 0, eyes: "x", tilt: Math.PI, alpha: 0.85, pulse: 0.2, size }),
+    sunk: () => ({ ...floor, ...lively, color: hsl(hue, SUNK.sat, SUNK.light), glow: 0, eyes: "x", tilt: Math.PI, alpha: 0.85, pulse: 0.2, size }),
   };
   return { c, phase: kind, ...places[kind]() };
 }
 
-function drawLabel(ctx, text, x, y, w) {
+function drawLabel(ctx, text, x, y, w, p) {
   ctx.font = `${Math.round(w * 0.042)}px system-ui, sans-serif`;
   const shown = text.length > 24 ? `${text.slice(0, 23)}…` : text;
   const width = ctx.measureText(shown).width + 16;
   const left = Math.min(Math.max(x - width / 2, 6), w - width - 6);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+  ctx.fillStyle = p.labelBg;
   ctx.beginPath();
   ctx.roundRect(left, y, width, w * 0.075, 8);
   ctx.fill();
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = p.labelText;
   ctx.textBaseline = "middle";
   ctx.fillText(shown, left + 8, y + w * 0.0375);
 }
 
 export function drawScene(ctx, scene) {
-  const { w, h, t, now, brood, waiting, hover, labelFor } = scene;
+  const { w, h, t, now, brood, waiting, hover, labelFor, palette } = scene;
   const m = MOODS[scene.mood] ?? MOODS.content;
   const mother = motherAt(w, h, t);
-  drawBackground(ctx, w, h, t);
-  drawFloor(ctx, w, h, t);
+  drawBackground(ctx, w, h, t, palette);
+  drawFloor(ctx, w, h, t, palette);
   Array.from({ length: Math.min(waiting, 10) }, (_, i) => i).forEach((i) =>
-    drawEgg(ctx, w * (0.12 + 0.76 * ((i * 0.618 + 0.1) % 1)), h * (0.945 + (i % 2) * 0.012), w * 0.024, t, i),
+    drawEgg(ctx, w * (0.12 + 0.76 * ((i * 0.618 + 0.1) % 1)), h * (0.945 + (i % 2) * 0.012), w * 0.024, t, i, palette),
   );
   const placed = [...brood.creatures.values()].map((c) => place(c, now, t, w, h, mother));
   const onFloor = ["settling", "resting", "sinking", "sunk"];
-  placed.filter((p) => onFloor.includes(p.phase)).forEach((p) => drawSquid(ctx, { ...p, t }));
-  drawSquid(ctx, { ...m, x: mother.x, y: mother.y, size: mother.size, t, tentacles: 8, length: 1.5, tilt: Math.sin(t * 0.4) * 0.03 });
+  placed.filter((p) => onFloor.includes(p.phase)).forEach((p) => drawSquid(ctx, { ...p, t, palette }));
+  drawSquid(ctx, { ...m, color: palette.mood[scene.mood] ?? palette.mood.content, palette, x: mother.x, y: mother.y, size: mother.size, t, tentacles: 8, length: 1.5, tilt: Math.sin(t * 0.4) * 0.03 });
   if (scene.mood === "asleep") {
-    ctx.fillStyle = "rgba(220, 230, 255, 0.7)";
+    ctx.fillStyle = alpha(palette.sleep, 0.7);
     ctx.font = `${Math.round(w * 0.07)}px system-ui, sans-serif`;
     [0, 1, 2].forEach((k) => {
       const u = ((t * 0.25 + k / 3) % 1);
@@ -297,7 +301,7 @@ export function drawScene(ctx, scene) {
     });
     ctx.globalAlpha = 1;
   }
-  placed.filter((p) => !onFloor.includes(p.phase)).forEach((p) => drawSquid(ctx, { ...p, t }));
+  placed.filter((p) => !onFloor.includes(p.phase)).forEach((p) => drawSquid(ctx, { ...p, t, palette }));
   const at = new Map(placed.map((p) => [p.c.jobId, p]));
   brood.pearls.forEach((pearl) => {
     const from = at.get(pearl.jobId);
@@ -306,8 +310,8 @@ export function drawScene(ctx, scene) {
     const p = mix(from, { x: mother.x, y: mother.y }, u);
     const x = p.x + Math.sin(u * 9) * 5;
     const glow = ctx.createRadialGradient(x, p.y, 0, x, p.y, w * 0.035);
-    glow.addColorStop(0, "rgba(255, 244, 200, 0.95)");
-    glow.addColorStop(1, "rgba(255, 244, 200, 0)");
+    glow.addColorStop(0, alpha(palette.pearl, 0.95));
+    glow.addColorStop(1, alpha(palette.pearl, 0));
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(x, p.y, w * 0.035, 0, TAU);
@@ -315,6 +319,6 @@ export function drawScene(ctx, scene) {
   });
   const hits = placed.map((p) => ({ jobId: p.c.jobId, conversationId: p.c.conversationId, x: p.x, y: p.y, r: Math.max(p.size * 2.6, 28) }));
   const hovered = placed.find((p) => p.c.jobId === hover);
-  if (hovered) drawLabel(ctx, labelFor(hovered.c), hovered.x, hovered.y + hovered.size * 2.2, w);
+  if (hovered) drawLabel(ctx, labelFor(hovered.c), hovered.x, hovered.y + hovered.size * 2.2, w, palette);
   return hits;
 }

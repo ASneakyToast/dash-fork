@@ -79,6 +79,7 @@ dash stores the private key and secrets as plain JSONB. Protect the database.
 | `MEMORY_BASE_URL`, `MEMORY_API_KEY` | Empty (Bedrock). An OpenAI-compatible `/v1` URL and its key. The embedding model must accept `dimensions: 1024`. |
 | `DASH_PLUGINS` | Comma-separated `module:attribute` plugins to load without installing them. Empty by default. |
 | `DASH_PLUGINS_DISABLED` | Comma-separated plugin entry point names to skip. Empty by default. |
+| `DASH_THEME_OVERRIDES` | Path to a JSON file of design token overrides, applied on top of every theme. See `docs/theming.md`. Empty by default. |
 
 ## Deploy
 

@@ -32,6 +32,7 @@ class Settings:
     memory_top_k: int
     plugins: tuple[str, ...] = ()
     plugins_disabled: tuple[str, ...] = ()
+    theme_overrides: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -54,4 +55,5 @@ class Settings:
             memory_top_k=int(_env("MEMORY_TOP_K", "8")),
             plugins=_list("DASH_PLUGINS"),
             plugins_disabled=_list("DASH_PLUGINS_DISABLED"),
+            theme_overrides=_env("DASH_THEME_OVERRIDES", ""),
         )
