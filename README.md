@@ -78,6 +78,7 @@ dash stores the private key and secrets as plain JSONB. Protect the database.
 | `EMBED_MODEL`, `EXTRACT_MODEL`, `MEMORY_TOP_K` | Titan v2, Haiku 4.5, `8` |
 | `DASH_PLUGINS` | Comma-separated `module:attribute` plugins to load without installing them. Empty by default. |
 | `DASH_PLUGINS_DISABLED` | Comma-separated plugin entry point names to skip. Empty by default. |
+| `DASH_THEME_OVERRIDES` | Path to a JSON file of design token overrides, applied on top of every theme. See `docs/theming.md`. Empty by default. |
 
 ## Deploy
 

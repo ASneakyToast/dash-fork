@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,7 @@ from dash.memory import Embedder
 from dash.nango import Nango
 from dash.plugins import API_VERSION, Context, Plugins, discover
 from dash.queue import Queue
+from dash.theme import Theme, load_overrides
 
 STATIC = Path(__file__).parent / "static"
 ENTRY_ID = re.compile(r"^\d+-\d+$")
@@ -54,9 +55,11 @@ def create_app(
     public: dict[str, str] | None = None,
     routers: Sequence[APIRouter] = (),
     plugins: Plugins | None = None,
+    overrides: Theme | None = None,
     lifespan: Callable[[FastAPI], AbstractAsyncContextManager[None]] | None = None,
 ) -> FastAPI:
     plugins = plugins or Plugins()
+    themes = plugins.themes(overrides)
     ctx = Context("api", store, queue)
 
     @asynccontextmanager
@@ -153,6 +156,14 @@ def create_app(
     async def plugin_list() -> dict[str, Any]:
         return {"api": API_VERSION, "plugins": plugins.manifest()}
 
+    @app.get("/api/theme")
+    async def theme_manifest() -> dict[str, Any]:
+        return themes.manifest()
+
+    @app.get("/api/theme.css")
+    async def theme_css() -> Response:
+        return Response(themes.css, media_type="text/css", headers={"Cache-Control": "no-cache"})
+
     @app.get("/api/memories")
     async def memories(q: str = "") -> list[dict[str, Any]]:
         if q.strip():
@@ -239,5 +250,6 @@ def create_production_app() -> FastAPI:
             )
         ],
         plugins=plugins,
+        overrides=load_overrides(settings.theme_overrides),
         lifespan=lifespan,
     )

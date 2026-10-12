@@ -1,0 +1,46 @@
+{
+  "name": "tidepool",
+  "title": "Tidepool",
+  "dark": {
+    "dash": {
+      "color": {
+        "bg": {
+          "$type": "color",
+          "$value": "#06141f"
+        },
+        "surface": {
+          "$type": "color",
+          "$value": "#0b2233"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "#e6f4ff"
+        },
+        "text-muted": {
+          "$type": "color",
+          "$value": "#8fb4cc"
+        },
+        "border": {
+          "$type": "color",
+          "$value": "#16405a"
+        },
+        "accent": {
+          "$type": "color",
+          "$value": "#5fd0c4"
+        },
+        "on-accent": {
+          "$type": "color",
+          "$value": "#04201d"
+        },
+        "bubble-user": {
+          "$type": "color",
+          "$value": "#0f3a52"
+        },
+        "danger": {
+          "$type": "color",
+          "$value": "#ff8a7a"
+        }
+      }
+    }
+  }
+}
