@@ -33,6 +33,18 @@ Or without installing: `PYTHONPATH=examples/dash-brood/src DASH_PLUGINS=dash_bro
 - `static`, `script`, `style`: the panel is a plain ES module and a stylesheet, with no build step.
 - The browser module calls `dash.addDock` for the panel and `dash.onActivity` for the live feed of job state changes.
 - `dash.openConversation` lets a click on a squid open its chat.
+- `tokens`, `themes` and `dash.theme` add design tokens and a whole theme, and read them from the canvas.
+
+## Theming
+
+The panel is themed like the rest of dash, and it shows what a plugin does for theming:
+
+- `tokens`: 19 `brood.*` tokens, with a light and a dark value each where the tank should differ. They cover the water, the sea floor, the light, the eggs, the pearl and the five moods.
+- `themes`: `tidepool`, a dark-only theme that recolors dash itself in deep-sea teal. A plugin can ship a theme for the whole app.
+- `palette.js` lists every token the drawing code reads. `art.js` has no color literals except the per-job squid hues, which come from a hash of the job id and are data, not theme.
+- `dash.theme.onChange` re-reads the palette, so the tank changes color the moment the theme or the mode does.
+
+See [docs/theming.md](../../docs/theming.md).
 
 ## Tests
 

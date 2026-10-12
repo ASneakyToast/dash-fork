@@ -6,7 +6,7 @@ import logging
 import re
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Iterable, Sequence
 from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from dash.db import Store
 from dash.queue import Activity, Queue
+from dash.theme import CORE, Theme, ThemeSet, Token, builtin_themes, core_tokens
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,8 @@ class Plugin:
     static: Path | None = None
     script: str | None = None
     style: str | None = None
+    tokens: Sequence[Token] = ()
+    themes: Sequence[Theme] = ()
 
 
 @dataclass(frozen=True)
@@ -76,11 +79,11 @@ def build(target: object) -> Plugin:
     return plugin
 
 
-def check(plugin: Plugin, taken: Collection[str]) -> None:
+def check(plugin: Plugin, loaded: Sequence[Plugin]) -> None:
     """Raise ValueError if dash cannot run the plugin."""
-    if not NAME.fullmatch(plugin.name):
+    if not NAME.fullmatch(plugin.name) or plugin.name == CORE:
         raise ValueError(f"{plugin.name!r} is not a valid plugin name.")
-    if plugin.name in taken:
+    if plugin.name in {other.name for other in loaded}:
         raise ValueError(f"another plugin is already called {plugin.name!r}.")
     if plugin.api != API_VERSION:
         raise ValueError(f"needs plugin API {plugin.api}, but dash has {API_VERSION}.")
@@ -88,6 +91,23 @@ def check(plugin: Plugin, taken: Collection[str]) -> None:
         raise ValueError(f"static directory {plugin.static} does not exist.")
     if (plugin.script or plugin.style) and plugin.static is None:
         raise ValueError("script and style need a static directory.")
+    check_theming(plugin, loaded)
+
+
+def check_theming(plugin: Plugin, loaded: Sequence[Plugin]) -> None:
+    """Raise ValueError if the plugin's tokens or themes clash with dash or another plugin."""
+    stray = [t.name for t in plugin.tokens if t.owner != plugin.name]
+    if stray:
+        raise ValueError(f"token {stray[0]} must start with '{plugin.name}.'.")
+    used_vars = {t.var for t in core_tokens()} | {t.var for p in loaded for t in p.tokens}
+    clash = [t.var for t in plugin.tokens if t.var in used_vars]
+    if clash or len({t.var for t in plugin.tokens}) < len(plugin.tokens):
+        raise ValueError(f"token variable {clash[0] if clash else 'names'} is already taken.")
+    used_themes = {t.name for t in builtin_themes()} | {t.name for p in loaded for t in p.themes}
+    names = [t.name for t in plugin.themes]
+    taken = used_themes & set(names) or {n for n in names if names.count(n) > 1}
+    if taken:
+        raise ValueError(f"theme {sorted(taken)[0]!r} is already taken.")
 
 
 def load_one(label: str, load: Callable[[], object], loaded: Sequence[Plugin]) -> Loaded | None:
@@ -96,7 +116,7 @@ def load_one(label: str, load: Callable[[], object], loaded: Sequence[Plugin]) -
         plugin = build(load())
         if plugin in loaded:
             return None
-        check(plugin, {other.name for other in loaded})
+        check(plugin, loaded)
     except Exception as ex:
         log.exception("plugin %s failed to load", label)
         return Loaded(label, error=f"{type(ex).__name__}: {ex}")
@@ -129,6 +149,21 @@ class Plugins:
     def active(self) -> list[Plugin]:
         """Return the plugins that loaded."""
         return [item.plugin for item in self.loaded if item.plugin]
+
+    def themes(self, overrides: Theme | None = None) -> ThemeSet:
+        """Return the tokens and themes of dash and every plugin that loaded."""
+        return ThemeSet(
+            [*core_tokens(), *(token for plugin in self.active for token in plugin.tokens)],
+            [
+                *builtin_themes(),
+                *(
+                    replace(theme, source=plugin.name)
+                    for plugin in self.active
+                    for theme in plugin.themes
+                ),
+            ],
+            overrides,
+        )
 
     def manifest(self) -> list[dict[str, Any]]:
         """Return what the browser needs to know about each plugin."""

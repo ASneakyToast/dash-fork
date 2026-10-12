@@ -1,5 +1,6 @@
 import { drawScene } from "./art.js";
 import { apply, createBrood, describe, prune, tally } from "./model.js";
+import { readPalette } from "./palette.js";
 
 const MOTHER_MS = 4000;
 const TITLES_MS = 20000;
@@ -10,6 +11,11 @@ export default function setup(dash) {
   const state = { mother: { mood: "content", waiting: 0 }, skew: 0, hover: null, hits: [], loading: false };
   const clock = () => Date.now() + state.skew;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const paint = () => readPalette((name) => dash.theme.get(name));
+  let palette = paint();
+  dash.theme.onChange(() => {
+    palette = paint();
+  });
 
   async function refreshTitles() {
     if (state.loading) return;
@@ -96,6 +102,7 @@ export default function setup(dash) {
             waiting: state.mother.waiting,
             hover: state.hover,
             labelFor,
+            palette,
           });
         }
         const text = describe(state.mother.mood, tally(brood, now), state.mother.waiting);

@@ -12,6 +12,7 @@ A plugin is a Python package that dash finds at startup. It can add API routes, 
 | Setup and teardown, such as a client or a background task | `lifespan` | `dash serve` and `dash worker` |
 | A reaction to a job changing state | `on_activity` | `dash worker` |
 | A live view of job state changes | `dash.onActivity` in the `script` | the browser |
+| Design tokens, and whole themes | `tokens`, `themes` | `dash serve`, applied in the browser |
 
 Every part is optional. A plugin that only listens for failures has just `name` and `on_activity`.
 
@@ -74,6 +75,8 @@ Plugin(
     static=Path("static"),
     script="brood.js",
     style="brood.css",
+    tokens=[Token("brood.water.top", "#4aa6d6", "#134069")],
+    themes=[Theme.load(Path("tidepool.json"))],
 )
 ```
 
@@ -83,6 +86,7 @@ Plugin(
 - `lifespan(ctx)` returns an async context manager, the same shape as a Starlette lifespan. If it raises while starting, dash logs it and carries on without it.
 - `on_activity(ctx, activity)` is awaited for each state change the worker reports. It is cut off after 5 seconds, and an exception is logged and swallowed.
 - `static` is a directory. `script` and `style` are file names inside it.
+- `tokens` and `themes` add design tokens and whole themes. `name` must not be `dash`, because tokens use it. See [theming.md](theming.md).
 
 `ctx` is a `Context`:
 
@@ -119,6 +123,7 @@ An `Activity` also has `id`, `job_id`, `conversation_id` and `at` (Unix seconds)
 | `dash.conversations()` | Returns the conversation list. |
 | `dash.plugin.api(path, opts)` | Calls your own routes: `dash.plugin.api("/mother")` fetches `/api/plugins/<name>/mother`. |
 | `dash.api(path, opts)` | Calls any dash API route. |
+| `dash.theme` | Reads design tokens (`dash.theme.get("brood.water.top")`) and reports theme changes. See [theming.md](theming.md). |
 | `dash.el(tag, props, ...children)`, `dash.config` | A small DOM helper, and the server config. |
 
 Tab and dock ids are prefixed with the plugin name, so ids never clash. A callback that throws is caught and logged to the console under the plugin's name. A plugin whose script fails to load shows as an error in the Apps tab, and the rest of the UI keeps working.

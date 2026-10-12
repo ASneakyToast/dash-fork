@@ -6,6 +6,7 @@ from fastapi.routing import APIRouter
 
 from dash.plugins import Context, Plugin
 from dash.queue import Activity
+from dash.theme import Theme, Token
 
 STATIC = Path(__file__).parent / "plugin_static"
 
@@ -81,3 +82,24 @@ fragile = Plugin(
     name="fragile", routes=broken_routes, lifespan=broken_lifespan, on_activity=explode
 )
 not_a_plugin = "hello"
+
+sunny = Theme("sunny", "Sunny", {"dash.color.bg": "#fffbe6", "themed.glow": "#ffcc00"})
+themed = Plugin(
+    name="themed",
+    tokens=[Token("themed.glow", "#ffee88", "#887700", description="A glow.")],
+    themes=[sunny],
+)
+strays = Plugin(name="strays", tokens=[Token("other.glow", "#fff")])
+dashing = Plugin(name="dash")
+hyphen = Plugin(name="a-b", tokens=[Token("a-b.c", "#fff")])
+dotted = Plugin(name="a", tokens=[Token("a.b-c", "#000")])
+doubled = Plugin(name="doubled", tokens=[Token("doubled.x", "#fff"), Token("doubled.x", "#000")])
+rival = Plugin(name="rival", themes=[Theme("sunny", "Rival", {"dash.color.bg": "#fff"})])
+mimic = Plugin(name="mimic", themes=[Theme("high-contrast", "Mimic", {"dash.color.bg": "#fff"})])
+copycat = Plugin(
+    name="copycat",
+    themes=[
+        Theme("same", "One", {"dash.color.bg": "#fff"}),
+        Theme("same", "Two", {"dash.color.bg": "#eee"}),
+    ],
+)
