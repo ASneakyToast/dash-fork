@@ -23,6 +23,8 @@ class Settings:
     nango_secret_key: str
     embed_model: str
     extract_model: str
+    memory_base_url: str
+    memory_api_key: str
     memory_top_k: int
 
     @classmethod
@@ -41,5 +43,7 @@ class Settings:
             nango_secret_key=_env("NANGO_SECRET_KEY", ""),
             embed_model=_env("EMBED_MODEL", "amazon.titan-embed-text-v2:0"),
             extract_model=_env("EXTRACT_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+            memory_base_url=_env("MEMORY_BASE_URL", "").rstrip("/"),
+            memory_api_key=_env("MEMORY_API_KEY", ""),
             memory_top_k=int(_env("MEMORY_TOP_K", "8")),
         )

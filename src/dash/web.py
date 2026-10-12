@@ -165,14 +165,15 @@ def create_app(
 
 
 def create_production_app() -> FastAPI:
-    """uvicorn factory: wires real Postgres, Redis, Bedrock and Nango from the environment."""
+    """uvicorn factory: wires real Postgres, Redis, memory models and Nango from the environment."""
     from dash.github import GitHubApi, GitHubStore, create_router
-    from dash.memory import Bedrock
+    from dash.memory import memory_models
 
     settings = Settings.from_env()
     store = Store.from_url(settings.database_url)
     queue = Queue.from_url(settings.redis_url)
     nango = Nango(settings.nango_url, settings.nango_secret_key)
+    memory = memory_models(settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
@@ -180,11 +181,12 @@ def create_production_app() -> FastAPI:
         await store.close()
         await queue.close()
         await nango.close()
+        await memory.close()
 
     return create_app(
         store=store,
         queue=queue,
-        embedder=Bedrock(settings.embed_model, settings.extract_model),
+        embedder=memory,
         nango=nango,
         public={
             "nango_host": settings.nango_public_url or settings.nango_url,

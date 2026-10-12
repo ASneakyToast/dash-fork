@@ -7,7 +7,7 @@ An always-on assistant in front of [hermes-agent](https://github.com/whatever/ge
 | Web UI (`src/dash/static`) | Chat, memories (list, search, add, delete), connected apps, and queue status. No build step. |
 | API (`dash serve`) | FastAPI. Stores each user message, then adds a job to the Redis stream `dash:jobs`. |
 | Worker (`dash worker`) | Reads `dash:jobs`, recalls memories from pgvector, and streams the hermes reply. Then it extracts new memories. |
-| Memories | Postgres + pgvector. Bedrock Titan v2 makes the embeddings. Bedrock Haiku extracts the facts. |
+| Memories | Postgres + pgvector. Bedrock Titan v2 makes the embeddings. Bedrock Haiku extracts the facts. Set `MEMORY_BASE_URL` to use an OpenAI-compatible API (LiteLLM, OpenRouter) instead. |
 | App keys | A self-hosted [Nango](https://nango.dev). Nango holds the OAuth tokens. dash and hermes ask Nango for them. |
 | GitHub (`src/dash/github`) | Creates a private GitHub App from a manifest and stores its keys in the `authorizations` table. Use `app_client` and `installation_client` to call GitHub. |
 
@@ -36,7 +36,7 @@ uv run dash worker &
 uv run dash serve
 ```
 
-The worker needs AWS credentials for Bedrock in the standard env chain. Outside Docker, Nango is optional. To use it, set `NANGO_URL` and `NANGO_SECRET_KEY`.
+The worker needs AWS credentials for Bedrock in the standard env chain, unless `MEMORY_BASE_URL` is set. Outside Docker, Nango is optional. To use it, set `NANGO_URL` and `NANGO_SECRET_KEY`.
 
 ## GitHub
 
@@ -60,6 +60,7 @@ dash stores the private key and secrets as plain JSONB. Protect the database.
 | `NANGO_URL`, `NANGO_SECRET_KEY` | `http://localhost:3003`, empty (disabled) |
 | `NANGO_PUBLIC_URL`, `NANGO_CONNECT_URL` | Browser-facing Nango API and Connect UI addresses |
 | `EMBED_MODEL`, `EXTRACT_MODEL`, `MEMORY_TOP_K` | Titan v2, Haiku 4.5, `8` |
+| `MEMORY_BASE_URL`, `MEMORY_API_KEY` | Empty (Bedrock). An OpenAI-compatible `/v1` URL and its key. The embedding model must accept `dimensions: 1024`. |
 
 ## Deploy
 

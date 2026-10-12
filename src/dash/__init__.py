@@ -44,7 +44,7 @@ def worker() -> None:
 async def _worker() -> None:
     from dash.db import Store
     from dash.hermes import Hermes
-    from dash.memory import Bedrock
+    from dash.memory import memory_models
     from dash.queue import Queue
     from dash.worker import Worker
 
@@ -54,7 +54,7 @@ async def _worker() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
-    bedrock = Bedrock(settings.embed_model, settings.extract_model)
+    memory = memory_models(settings)
     hermes = Hermes(settings.hermes_base_url, settings.hermes_api_key, settings.hermes_model)
     queue = Queue.from_url(settings.redis_url)
     async with Store.connect(settings.database_url) as store:
@@ -63,10 +63,11 @@ async def _worker() -> None:
                 store=store,
                 queue=queue,
                 chat=hermes,
-                embedder=bedrock,
-                extractor=bedrock,
+                embedder=memory,
+                extractor=memory,
                 top_k=settings.memory_top_k,
             ).run(stop)
         finally:
             await hermes.close()
+            await memory.close()
             await queue.close()
