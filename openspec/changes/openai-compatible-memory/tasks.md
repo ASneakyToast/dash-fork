@@ -28,7 +28,7 @@ Run after the fork image carrying this branch is pinned in jlithgow-ops (`docs/p
 
 ## 5. Upstream
 
-- [ ] 5.1 Squash the `fixup!` commit on `feat/openai-compatible-memory`. Verify: `git log` shows one commit above upstream `main`.
+- [ ] 5.1 Optional: squash the `fixup!` commit on `feat/openai-compatible-memory` for a tidier review (upstream squash-merges, so it vanishes on merge anyway). Verify: `git log` shows one commit above upstream `main`.
 - [ ] 5.2 Open the PR on `whatever/dash` from that branch. Verify: the PR diff has no `.github/workflows/joel-dash-build.yml` and no `openspec/changes/` files.
 
 ## Workflow follow-up
