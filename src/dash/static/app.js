@@ -16,12 +16,24 @@ async function api(path, opts = {}) {
 }
 
 const state = { conversation: null, config: {} };
+const touch = matchMedia("(pointer: coarse)");
+
+$("#menu").addEventListener("click", () => {
+  const open = $("aside").classList.toggle("open");
+  $("#menu").setAttribute("aria-expanded", String(open));
+});
+
+function closeMenu() {
+  $("aside").classList.remove("open");
+  $("#menu").setAttribute("aria-expanded", "false");
+}
 
 // Tabs
 document.querySelectorAll("nav button").forEach((btn) =>
   btn.addEventListener("click", () => {
     document.querySelectorAll("nav button, .tab").forEach((n) => n.classList.remove("active"));
     btn.classList.add("active");
+    closeMenu();
     $(`#tab-${btn.dataset.tab}`).classList.add("active");
     if (btn.dataset.tab === "memories") loadMemories();
     if (btn.dataset.tab === "apps") {
@@ -55,6 +67,7 @@ function bubble(role, text) {
 async function openConversation(id) {
   state.conversation = id;
   localStorage.setItem("conversation", id);
+  closeMenu();
   const messages = await api(`/api/conversations/${id}/messages`);
   $("#messages").replaceChildren();
   messages.forEach((m) => bubble(m.role, m.content));
@@ -117,7 +130,7 @@ $("#composer").addEventListener("submit", async (e) => {
 });
 
 $("#input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (e.key === "Enter" && !e.shiftKey && !touch.matches) {
     e.preventDefault();
     $("#composer").requestSubmit();
   }

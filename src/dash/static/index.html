@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>dash</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -11,21 +11,24 @@
     <header>
       <h1>dash</h1>
       <span id="queue" title="Job queue">…</span>
+      <button id="menu" type="button" aria-expanded="false" aria-controls="sidebar-chats">Chats</button>
     </header>
     <nav>
       <button data-tab="chat" class="active">Chat</button>
       <button data-tab="memories">Memories</button>
       <button data-tab="apps">Apps</button>
     </nav>
-    <button id="new-chat">+ New conversation</button>
-    <ul id="conversations"></ul>
+    <div id="sidebar-chats">
+      <button id="new-chat">+ New conversation</button>
+      <ul id="conversations"></ul>
+    </div>
   </aside>
 
   <main>
     <section id="tab-chat" class="tab active">
       <div id="messages"></div>
       <form id="composer">
-        <textarea id="input" rows="3" placeholder="Message hermes… (Enter sends, Shift+Enter is a new line)"></textarea>
+        <textarea id="input" rows="3" placeholder="Message hermes…"></textarea>
         <button type="submit">Send</button>
       </form>
     </section>
