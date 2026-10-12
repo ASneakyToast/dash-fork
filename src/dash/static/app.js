@@ -1,3 +1,5 @@
+import { createTheme } from "./theme.js";
+
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, props = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
@@ -304,6 +306,10 @@ function hostFor(plugin) {
       await openConversation(conversationId);
     },
     conversations: () => api("/api/conversations"),
+    theme: {
+      ...theme,
+      onChange: (fn) => theme.onChange(guard(fn)),
+    },
   };
 }
 
@@ -335,6 +341,34 @@ function loadPluginList() {
   if (!plugins.length) $("#plugin-list").append(el("li", { textContent: "No plugins installed." }));
 }
 
+function option(value, text) {
+  return el("option", { value, textContent: text });
+}
+
+function renderAppearance() {
+  const choice = theme.current();
+  const wanted = theme.themes().find((t) => t.name === choice.theme);
+  const modes = wanted && wanted.modes.length === 1 ? wanted.modes : ["auto", "light", "dark"];
+  $("#theme-pick").replaceChildren(
+    option("default", "Default"),
+    ...theme.themes().map((t) => option(t.name, t.source && t.source !== "dash" ? `${t.title} (${t.source})` : t.title)),
+  );
+  $("#theme-pick").value = choice.theme;
+  $("#mode-pick").replaceChildren(...modes.map((m) => option(m, m === "auto" ? "Match system" : m)));
+  $("#mode-pick").value = choice.mode;
+  $("#mode-pick").disabled = modes.length === 1;
+  const warnings = [
+    ...(wanted?.warnings ?? []).map((w) => `${wanted.title}: ${w}`),
+    ...(theme.overrides()?.warnings ?? []).map((w) => `Your overrides: ${w}`),
+  ];
+  $("#theme-warnings").replaceChildren(...warnings.map((w) => el("li", { textContent: w })));
+}
+
+$("#appearance").addEventListener("change", () => {
+  theme.select({ theme: $("#theme-pick").value, mode: $("#mode-pick").value });
+  renderAppearance();
+});
+
 // Queue badge
 async function pollQueue() {
   try {
@@ -347,6 +381,14 @@ async function pollQueue() {
 
 // Boot
 state.config = await api("/api/config");
+const theme = createTheme({
+  manifest: await api("/api/theme"),
+  root: document.documentElement,
+  dark: matchMedia("(prefers-color-scheme: dark)"),
+  style: () => getComputedStyle(document.documentElement),
+  storage: localStorage,
+});
+renderAppearance();
 const list = await loadConversations();
 const last = localStorage.getItem("conversation");
 if (last && list.some((c) => c.id === last)) openConversation(last);

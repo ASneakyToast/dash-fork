@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>dash</title>
+  <script>
+    try {
+      const [theme, mode] = (localStorage.getItem("dash.applied") ?? "").split(" ");
+      if (theme && theme !== "default") document.documentElement.dataset.theme = theme;
+      if (mode === "light" || mode === "dark") document.documentElement.dataset.mode = mode;
+    } catch {}
+  </script>
+  <link rel="stylesheet" href="/api/theme.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -53,6 +61,13 @@
         <button type="button" id="github-sync">Refresh</button>
       </form>
       <ul id="github-list"></ul>
+      <h2>Appearance</h2>
+      <p class="hint">A theme is a set of design tokens. Plugins can add themes and tokens. See docs/theming.md.</p>
+      <form id="appearance">
+        <label>Theme <select id="theme-pick"></select></label>
+        <label>Mode <select id="mode-pick"></select></label>
+      </form>
+      <ul id="theme-warnings" class="meta"></ul>
       <h2>Plugins</h2>
       <p class="hint">Plugins are Python packages installed next to dash. See docs/plugins.md.</p>
       <ul id="plugin-list"></ul>

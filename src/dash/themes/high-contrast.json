@@ -1,0 +1,88 @@
+{
+  "name": "high-contrast",
+  "title": "High contrast",
+  "light": {
+    "dash": {
+      "color": {
+        "bg": {
+          "$type": "color",
+          "$value": "#ffffff"
+        },
+        "surface": {
+          "$type": "color",
+          "$value": "#ffffff"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "#000000"
+        },
+        "text-muted": {
+          "$type": "color",
+          "$value": "#333333"
+        },
+        "border": {
+          "$type": "color",
+          "$value": "#000000"
+        },
+        "accent": {
+          "$type": "color",
+          "$value": "#0030c0"
+        },
+        "on-accent": {
+          "$type": "color",
+          "$value": "#ffffff"
+        },
+        "bubble-user": {
+          "$type": "color",
+          "$value": "#e3ebff"
+        },
+        "danger": {
+          "$type": "color",
+          "$value": "#a00000"
+        }
+      }
+    }
+  },
+  "dark": {
+    "dash": {
+      "color": {
+        "bg": {
+          "$type": "color",
+          "$value": "#000000"
+        },
+        "surface": {
+          "$type": "color",
+          "$value": "#000000"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "#ffffff"
+        },
+        "text-muted": {
+          "$type": "color",
+          "$value": "#d4d4d4"
+        },
+        "border": {
+          "$type": "color",
+          "$value": "#ffffff"
+        },
+        "accent": {
+          "$type": "color",
+          "$value": "#74b9ff"
+        },
+        "on-accent": {
+          "$type": "color",
+          "$value": "#000000"
+        },
+        "bubble-user": {
+          "$type": "color",
+          "$value": "#00264d"
+        },
+        "danger": {
+          "$type": "color",
+          "$value": "#ff8080"
+        }
+      }
+    }
+  }
+}
