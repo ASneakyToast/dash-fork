@@ -72,5 +72,6 @@ h2 { font-size: 16px; margin: 12px 0 0; }
 #dock { width: 320px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--panel); }
 #dock[hidden] { display: none; }
 .dock-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-@media (max-width: 900px) { #dock { display: none; } }
+nav button[hidden] { display: none; }
+.tab-dock { padding: 0; }
 .error-text { color: #dc2626; }

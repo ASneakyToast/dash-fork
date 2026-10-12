@@ -247,6 +247,7 @@ $("#github-create").addEventListener("submit", async (e) => {
 });
 
 // Plugins
+const narrowScreen = matchMedia("(max-width: 900px)");
 const feed = { events: [], listeners: new Set() };
 const FEED_LIMIT = 200;
 let plugins = [];
@@ -273,6 +274,22 @@ function guarded(plugin, fn) {
 function hostFor(plugin) {
   const guard = (fn) => guarded(plugin, fn);
   const id = (name) => `${plugin.name}-${name}`;
+  const addTab = ({ id: name, title, mount }) => {
+    const button = el("button", { textContent: title });
+    button.dataset.tab = id(name);
+    const root = el("section", { id: `tab-${id(name)}`, className: "tab" });
+    let mounted = false;
+    tabHooks[id(name)] = () => {
+      if (!mounted) {
+        mounted = true;
+        guard(mount)(root);
+      }
+    };
+    bindTab(button);
+    $("nav").append(button);
+    $("main").append(root);
+    return { root, button };
+  };
   return {
     api,
     el,
@@ -282,27 +299,21 @@ function hostFor(plugin) {
       version: plugin.version,
       api: (path, opts) => api(`/api/plugins/${plugin.name}${path}`, opts),
     },
-    addTab({ id: name, title, mount }) {
-      const button = el("button", { textContent: title });
-      button.dataset.tab = id(name);
-      const root = el("section", { id: `tab-${id(name)}`, className: "tab" });
-      let mounted = false;
-      tabHooks[id(name)] = () => {
-        if (!mounted) {
-          mounted = true;
-          guard(mount)(root);
-        }
-      };
-      bindTab(button);
-      $("nav").append(button);
-      $("main").append(root);
-      return root;
-    },
+    addTab: (options) => addTab(options).root,
     addDock({ id: name, title, mount }) {
       const root = el("section", { id: `dock-${id(name)}`, className: "dock-panel" });
       root.setAttribute("aria-label", title);
-      $("#dock").append(root);
-      $("#dock").hidden = false;
+      const { root: tab, button } = addTab({ id: `${name}-dock`, title, mount: () => {} });
+      tab.classList.add("tab-dock");
+      const place = () => {
+        const narrow = narrowScreen.matches;
+        (narrow ? tab : $("#dock")).append(root);
+        button.hidden = !narrow;
+        $("#dock").hidden = narrow || !$("#dock").children.length;
+        if (!narrow && button.classList.contains("active")) showTab("chat");
+      };
+      narrowScreen.addEventListener("change", place);
+      place();
       guard(mount)(root);
       return root;
     },

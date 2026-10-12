@@ -20,3 +20,16 @@
   text-align: center;
   color: var(--muted);
 }
+
+.tab-dock .brood-frame {
+  margin: 0;
+}
+
+.tab-dock .brood-canvas {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.tab-dock .brood-status {
+  margin: 8px 12px calc(8px + env(safe-area-inset-bottom));
+}

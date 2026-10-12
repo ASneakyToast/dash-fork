@@ -43,18 +43,19 @@ export default function setup(dash) {
       frame.append(canvas);
       root.append(frame, status);
       const ctx = canvas.getContext("2d");
-      let size = { w: 0, h: 0, dpr: 1 };
+      let size = { w: 0, h: 0, dpr: 1, framed: true };
 
       const fit = () => {
         const box = frame.getBoundingClientRect();
-        const w = Math.floor(Math.min(box.width, box.height * ASPECT));
-        const h = Math.floor(w / ASPECT);
+        const framed = !frame.closest(".tab-dock");
+        const w = Math.floor(framed ? Math.min(box.width, box.height * ASPECT) : box.width);
+        const h = Math.floor(framed ? w / ASPECT : box.height);
         const dpr = window.devicePixelRatio || 1;
         canvas.style.width = `${w}px`;
         canvas.style.height = `${h}px`;
         canvas.width = Math.round(w * dpr);
         canvas.height = Math.round(h * dpr);
-        size = { w, h, dpr };
+        size = { w, h, dpr, framed };
       };
       new ResizeObserver(fit).observe(frame);
 
@@ -89,6 +90,7 @@ export default function setup(dash) {
           state.hits = drawScene(ctx, {
             w: size.w,
             h: size.h,
+            framed: size.framed,
             t: (ms / 1000) * (reduced.matches ? 0.2 : 1),
             now,
             brood,
