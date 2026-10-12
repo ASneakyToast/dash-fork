@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> Fork (ASneakyToast/dash-fork): read `FORK.md` before branching or committing.
+
 ## Code style
 
 - Use list, dict, and set comprehensions and generator expressions instead of `for` loops, especially loops that call `.append()`.
