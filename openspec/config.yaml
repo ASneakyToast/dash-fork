@@ -1,0 +1,29 @@
+schema: spec-driven
+
+context: |
+  dash is a single-user assistant with no authentication of its own. It is meant to
+  run behind a trusted network, so specs must not assume per-user data or login.
+  Specs describe behavior a client or operator can observe (HTTP responses, events,
+  stored data, configuration), not internal functions or class names.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
