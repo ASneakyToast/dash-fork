@@ -1,13 +1,10 @@
 schema: spec-driven
 
-# Project context (optional)
-# Add only constraints that should guide OpenSpec artifacts and workflows.
-# Include constraints an agent cannot infer by reading the code.
-# Keep general project documentation and discoverable codebase facts out.
-# Example:
-#   context: |
-#     Designs and tasks must cover Windows, macOS, and Linux
-#     Write all artifacts in Spanish
+context: |
+  dash is a single-user assistant with no authentication of its own. It is meant to
+  run behind a trusted network, so specs must not assume per-user data or login.
+  Specs describe behavior a client or operator can observe (HTTP responses, events,
+  stored data, configuration), not internal functions or class names.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
