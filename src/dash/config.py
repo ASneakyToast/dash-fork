@@ -33,6 +33,9 @@ class Settings:
     plugins: tuple[str, ...] = ()
     plugins_disabled: tuple[str, ...] = ()
     theme_overrides: str = ""
+    agents: str = ""
+    default_agent: str = ""
+    worker_concurrency: int = 4
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -56,4 +59,7 @@ class Settings:
             plugins=_list("DASH_PLUGINS"),
             plugins_disabled=_list("DASH_PLUGINS_DISABLED"),
             theme_overrides=_env("DASH_THEME_OVERRIDES", ""),
+            agents=_env("DASH_AGENTS", ""),
+            default_agent=_env("DASH_DEFAULT_AGENT", ""),
+            worker_concurrency=int(_env("DASH_WORKER_CONCURRENCY", "4")),
         )

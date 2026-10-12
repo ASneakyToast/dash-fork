@@ -5,6 +5,9 @@ Each job also gets its own `dash:events:<job>` stream. The worker appends deltas
 there and the API replays it to the browser over SSE, so a page reload mid-reply
 picks up from the start.
 
+`dash:control:<job>` carries the browser's answers back to the worker while a job runs:
+a cancel, or the choice for a permission question from the agent.
+
 `dash:activity` is one capped stream for all jobs. The worker appends an entry each time
 a job changes state, and plugins read it to show what dash is doing.
 """
@@ -12,7 +15,7 @@ a job changes state, and plugins read it to show what dash is doing.
 import contextlib
 import json
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -32,6 +35,11 @@ SOCKET_TIMEOUT_SECONDS = 30
 
 def events_key(job_id: str) -> str:
     return f"dash:events:{job_id}"
+
+
+def control_key(job_id: str) -> str:
+    """Return the key of the stream that carries the browser's answers for a job."""
+    return f"dash:control:{job_id}"
 
 
 @dataclass(frozen=True)
@@ -122,6 +130,11 @@ class Queue:
         entry_id, fields = entries[0]
         return Job(entry_id, fields["job_id"], fields["conversation_id"])
 
+    async def touch(self, consumer: str, entry_ids: Sequence[str]) -> None:
+        """Reset the idle time of jobs this consumer still runs, so no other worker claims them."""
+        if entry_ids:
+            await self.redis.xclaim(JOBS, GROUP, consumer, 0, list(entry_ids), justid=True)
+
     async def ack(self, job: Job) -> None:
         await self.redis.xack(JOBS, GROUP, job.entry_id)
         await self.redis.xdel(JOBS, job.entry_id)
@@ -130,6 +143,25 @@ class Queue:
         key = events_key(job_id)
         await self.redis.xadd(key, {"kind": kind, "data": json.dumps(data)})
         await self.redis.expire(key, EVENTS_TTL_SECONDS)
+
+    async def control(self, job_id: str, kind: str, **data: object) -> None:
+        """Send an answer for a running job to the worker."""
+        key = control_key(job_id)
+        await self.redis.xadd(key, {"kind": kind, "data": json.dumps(data)})
+        await self.redis.expire(key, EVENTS_TTL_SECONDS)
+
+    async def controls(self, job_id: str, block_ms: int = 5000) -> AsyncIterator[dict[str, Any]]:
+        """Yield each answer sent for a job, from the first, until the caller stops."""
+        key = control_key(job_id)
+        last = "0"
+        while True:
+            read = cast(
+                "list[tuple[str, list[tuple[str, dict[str, str]]]]] | None",
+                await self.redis.xread({key: last}, block=block_ms),
+            )
+            for entry_id, fields in read[0][1] if read else []:
+                last = entry_id
+                yield {"kind": fields["kind"], **json.loads(fields["data"])}
 
     async def publish(self, kind: str, job: Job, **data: object) -> Activity:
         """Append an entry for the job to the shared activity stream and return it."""

@@ -44,6 +44,8 @@ class Conversation(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(Text, default="New conversation")
+    agent: Mapped[str | None] = mapped_column(Text, default=None)
+    session_id: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
@@ -59,6 +61,7 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(Text)
     content: Mapped[str] = mapped_column(Text)
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -149,8 +152,10 @@ class Store:
             )
             return rows.all()
 
-    async def create_conversation(self, title: str | None = None) -> Conversation:
-        conversation = Conversation(id=uuid.uuid4(), title=title or "New conversation")
+    async def create_conversation(
+        self, title: str | None = None, agent: str | None = None
+    ) -> Conversation:
+        conversation = Conversation(id=uuid.uuid4(), title=title or "New conversation", agent=agent)
         async with self._session() as session, session.begin():
             session.add(conversation)
         return conversation
@@ -168,8 +173,23 @@ class Store:
             )
             return rows.all()
 
-    async def add_message(self, conversation_id: uuid.UUID, role: str, content: str) -> Message:
-        message = Message(conversation_id=conversation_id, role=role, content=content)
+    async def set_session(self, conversation_id: uuid.UUID, session_id: str) -> None:
+        """Bind the conversation to the given agent session."""
+        async with self._session() as session, session.begin():
+            conversation = await session.get(Conversation, conversation_id)
+            if conversation is not None:
+                conversation.session_id = session_id
+
+    async def add_message(
+        self,
+        conversation_id: uuid.UUID,
+        role: str,
+        content: str,
+        details: dict[str, Any] | None = None,
+    ) -> Message:
+        message = Message(
+            conversation_id=conversation_id, role=role, content=content, details=details or {}
+        )
         async with self._session() as session, session.begin():
             session.add(message)
             conversation = await session.get(Conversation, conversation_id)
