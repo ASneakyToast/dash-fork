@@ -1,5 +1,7 @@
 # FORK.md
 
+<!-- KEEP THIS FILE IN SYNC: update it in the same PR as any change to the branch model, the fork-only files, the table of what joel-dash/main holds, or the fork's GitHub settings. -->
+
 This is `ASneakyToast/dash-fork`, Joel's fork of [`whatever/dash`](https://github.com/whatever/dash) (Matt's repo). Read this before creating a branch, committing, or opening a PR.
 
 The goal: Joel runs a customized dash, and good changes still go to Matt cleanly. One rule makes both work: **a branch that can go to Matt never contains a fork-only file.**
@@ -50,7 +52,7 @@ Never in a topic branch:
 
 | Change | Topic branch (for Matt) | Note |
 |---|---|---|
-| OpenAI-compatible memory | `feat/openai-compatible-memory` | Has a `fixup!` commit to squash before it goes up. Spec: `openspec/changes/openai-compatible-memory/`. |
+| OpenAI-compatible memory | `feat/openai-compatible-memory` | Has a `fixup!` commit. Matt squash-merges (his history is one commit per PR), so it vanishes on merge; squash only for a tidier review. Spec: `openspec/changes/openai-compatible-memory/`. |
 | OpenSpec baseline specs | `chore/openspec` | Merged here. |
 | Mobile UI | `feat/mobile-layout` | **Duplicate:** the fork line has its own commit (`0d32b73`). |
 | Plugin system + dash-brood | `claude/dash-plugin-system-ue2bwa` | **Duplicate:** the fork line has its own commits. |
@@ -59,6 +61,11 @@ Never in a topic branch:
 Not in `joel-dash/main` on purpose: `joel-dash/acp` (ACP agents).
 
 **Duplicates collapse on upstream merge.** When a topic branch lands in `whatever/dash`, refresh `main`, merge `upstream/main` into `joel-dash/main` (rule 5), and expect conflicts where the fork's copy differs. Resolve toward upstream's version unless the fork copy adds something.
+
+## Settings outside the repo
+
+- **Matt's `Docker` workflow (`docker-publish.yml`) is disabled** in the fork's Actions settings. It builds and deploys *his* repo: it pushes an image and then tells `<owner>/geometry.dev` to bump it. In the fork it only produced a stray `dash-fork` image and a failing `notify-geometry` job (no `GEOMETRY_BUMP_*` secrets). Don't re-enable it, and don't edit the file to fix it: `main` stays a mirror.
+- `joel-dash build` (`joel-dash-build.yml`) stays active. It is the only workflow the fork needs.
 
 ## Building and deploying
 
