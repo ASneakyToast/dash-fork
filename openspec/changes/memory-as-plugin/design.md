@@ -9,7 +9,7 @@ Memory touches four places in core: `Worker.handle` (recall before the agent cal
 - Identical behavior with the plugin on: the same recall, the same learning, the same events and activity.
 
 **Non-Goals**
-- Plugin-owned database tables and migrations. The `memories` table and pgvector stay in core migration 0001.
+- Plugin-owned database tables and migrations. The `memories` table and pgvector stay in core migration 0001. That migration is immutable history and already applied in deployed databases, so the table cannot move into a plugin without rewriting core history, which would diverge from Matt's repo.
 - Moving the memory code (`dash.memory`, the `Store` memory methods) out of core.
 - Making learning asynchronous.
 - A baseline spec for the rest of the plugin system.
@@ -39,7 +39,7 @@ Memory touches four places in core: `Worker.handle` (recall before the agent cal
 - [Fork divergence: `worker.py`, `web.py` and `app.js` lose their memory code] → The memory modules stay in core, so only call sites move.
 - [ACP edits the same part of `worker.py`] → Do this change after ACP merges, or on top of it.
 - [A slow before-turn hook delays every reply] → The 10-second cap, and the plugin does one embedding and one query. Several slow plugins add up.
-- [Memory off still needs pgvector, because the table is in the core migration] → Accepted for now; see the open questions.
+- [Memory off still needs pgvector, because the table is in the core migration] → Accepted. Even with plugin migrations, an existing deployment would keep the table, so this only changes for fresh installs.
 - [`/api/memories` disappears] → Only dash's own page called it. Nothing external is known to.
 - [hermes keeps its own memory (`MEMORY.md`, `USER.md`), so with the plugin on there are two] → Disable the plugin for agents that own their memory. That is the point of the switch.
 
@@ -53,6 +53,6 @@ Build the image with the plugin and deploy it. Memories already in Postgres keep
 
 ## Open Questions
 
-- Should plugins own tables and migrations, so the memory tables leave the core migration and memory off means no pgvector?
+- Plugin-owned tables, for the first plugin that needs its own (a new memory design, or one that keeps state of its own). Common practice is that each plugin ships its own migration history and the host runs it, with tables namespaced by plugin, thin links to core rows by id, and disabling a plugin never dropping its data. For dash that suggests `Plugin(migrations=Path(...))`, where each plugin gets its own Alembic folder and its own version table, and `dash migrate` runs core first, then each plugin. That leaves core's single linear history, and the test that enforces one head, untouched. The alternatives are Alembic branches in the shared history, which tie plugins to core's order, and plugins creating tables at startup, which has no upgrades and can race between the API and the worker. Deferred to its own change, not part of this one.
 - Is a hook enough for a harness-owned memory such as mem0, or does that work as tools the agent calls, with no hook at all? If it is tools, the answer is simply that no memory plugin is installed.
 - Should the hooks go upstream to Matt as a plugin-API proposal on their own, before the memory move?
