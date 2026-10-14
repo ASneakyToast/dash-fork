@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from dash.db import Authorization, Conversation, Memory, Message
 from dash.github.api import Installation, NewApp
 from dash.github.db import APP, INSTALLATION, PROVIDER
+from dash.hermes import Delta
 
 CLIENT_SECRET = "fake-client-secret"  # noqa: S105
 
@@ -94,15 +95,15 @@ class FakeExtractor:
 
 
 class FakeChat:
-    def __init__(self, chunks: list[str], fail: bool = False) -> None:
+    def __init__(self, chunks: list[str | Delta], fail: bool = False) -> None:
         self.chunks = chunks
         self.fail = fail
         self.seen: list[list[dict[str, str]]] = []
 
-    async def stream(self, messages: Sequence[Mapping[str, str]]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Mapping[str, str]]) -> AsyncIterator[Delta]:
         self.seen.append([dict(m) for m in messages])
         for chunk in self.chunks:
-            yield chunk
+            yield Delta("text", chunk) if isinstance(chunk, str) else chunk
         if self.fail:
             raise RuntimeError("upstream down")
 

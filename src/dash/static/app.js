@@ -95,16 +95,51 @@ $("#new-chat").addEventListener("click", async () => {
 function follow(jobId, node) {
   return new Promise((resolve) => {
     const source = new EventSource(`/api/jobs/${jobId}/events`);
+    const trace = el("div", { className: "trace" });
+    node.before(trace);
+    const tools = new Map();
     let text = "";
+    let thinking = null;
+    const thought = () => {
+      if (!thinking) {
+        const body = el("div", { className: "thinking-body" });
+        thinking = el("details", { className: "thinking", open: true }, el("summary", { textContent: "Thinking" }), body);
+        thinking.body = body;
+        trace.append(thinking);
+      }
+      return thinking;
+    };
+    const settle = () => {
+      if (thinking) thinking.open = false;
+      thinking = null;
+    };
     source.onmessage = (e) => {
       const ev = JSON.parse(e.data);
       if (ev.kind === "delta") {
+        settle();
         text += ev.text;
         node.textContent = text;
-        node.scrollIntoView({ block: "end" });
+      } else if (ev.kind === "reasoning") {
+        thought().body.textContent += ev.text;
+      } else if (ev.kind === "tool") {
+        settle();
+        const id = ev.toolCallId || `${ev.tool}-${tools.size}`;
+        let row = tools.get(id);
+        if (!row) {
+          row = el("div", { className: "tool" });
+          tools.set(id, row);
+          trace.append(row);
+        }
+        if (ev.label || !row.label) row.label = ev.label || ev.tool;
+        row.dataset.status = ev.status || "running";
+        row.textContent = `${ev.emoji || "\u{1F527}"} ${ev.tool}${row.label && row.label !== ev.tool ? `: ${row.label}` : ""}`;
+      } else if (ev.kind === "status") {
+        trace.append(el("div", { className: "status", textContent: ev.message || JSON.stringify(ev) }));
       } else if (ev.kind === "memories") {
-        node.after(el("div", { className: "recalled", textContent: `Recalled ${ev.items.length} memories` }));
+        trace.prepend(el("div", { className: "recalled", textContent: `Recalled ${ev.items.length} memories` }));
       } else if (ev.kind === "done" || ev.kind === "error") {
+        settle();
+        tools.forEach((row) => row.dataset.status === "running" && (row.dataset.status = "completed"));
         if (ev.kind === "error") {
           node.classList.add("error");
           node.textContent = text + `\n\n${ev.message}`;
@@ -112,6 +147,7 @@ function follow(jobId, node) {
         source.close();
         resolve();
       }
+      node.scrollIntoView({ block: "end" });
     };
   });
 }

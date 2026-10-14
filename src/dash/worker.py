@@ -10,6 +10,7 @@ from typing import Protocol
 from redis.exceptions import RedisError
 
 from dash.db import Store
+from dash.hermes import Delta
 from dash.memory import (
     DUPLICATE_DISTANCE,
     RELEVANT_DISTANCE,
@@ -27,7 +28,7 @@ RETRY_SECONDS = 2
 
 
 class Chat(Protocol):
-    def stream(self, messages: Sequence[Mapping[str, str]]) -> AsyncIterator[str]: ...
+    def stream(self, messages: Sequence[Mapping[str, str]]) -> AsyncIterator[Delta]: ...
 
 
 class Worker:
@@ -90,20 +91,34 @@ class Worker:
         messages += [{"role": m.role, "content": m.content} for m in history]
 
         reply: list[str] = []
-        buffer = ""
+        buffers = {"text": "", "reasoning": ""}
+        events = {"text": "delta", "reasoning": "reasoning"}
+
+        async def flush(kind: str) -> None:
+            if buffers[kind]:
+                await self.queue.emit(job.job_id, events[kind], text=buffers[kind])
+                buffers[kind] = ""
+
         try:
             async for delta in self.chat.stream(messages):
-                reply.append(delta)
-                buffer += delta
-                if len(buffer) >= FLUSH_CHARS:
-                    await self.queue.emit(job.job_id, "delta", text=buffer)
-                    buffer = ""
+                if delta.kind in buffers:
+                    other = "reasoning" if delta.kind == "text" else "text"
+                    await flush(other)
+                    if delta.kind == "text":
+                        reply.append(delta.text)
+                    buffers[delta.kind] += delta.text
+                    if len(buffers[delta.kind]) >= FLUSH_CHARS:
+                        await flush(delta.kind)
+                else:
+                    await flush("reasoning")
+                    await flush("text")
+                    await self.queue.emit(job.job_id, delta.kind, **delta.data)
         except Exception as ex:
             log.exception("hermes call failed")
             await self.queue.emit(job.job_id, "error", message=f"hermes: {ex}")
             return
-        if buffer:
-            await self.queue.emit(job.job_id, "delta", text=buffer)
+        await flush("reasoning")
+        await flush("text")
 
         text = "".join(reply)
         message = await self.store.add_message(conversation_id, "assistant", text)
