@@ -1,0 +1,96 @@
+# Production defaults. values-local.yaml overrides them for Rancher Desktop.
+
+image:
+  repository: ghcr.io/whatever/dash
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Kustomize commonLabels from geometry.dev/apps/dash. They are in every
+# selector, and selectors are immutable, so keep them to adopt the prod objects.
+commonLabels:
+  app.kubernetes.io/name: dash
+  app.kubernetes.io/managed-by: argocd
+
+scheme: https
+hosts:
+  dash: dash.geometry.dev
+  nango: nango.geometry.dev
+  nangoConnect: nango-connect.geometry.dev
+  agent: dash-agent.geometry.dev
+
+hermes:
+  model: hermes-opus
+
+storageClassName: local-path
+
+ingress:
+  basicAuth:
+    enabled: true
+
+networkPolicies:
+  enabled: true
+
+# Secrets that the chart does not own. geometry-config is shared by the
+# cluster and holds DASH_DATABASE_URL, NANGO_DATABASE_URL and the
+# HERMES_DASHBOARD_* keys.
+configSecret: geometry-config
+
+externalSecrets:
+  enabled: true
+  store: aws-secretsmanager
+  items:
+    dash:
+      key: geometry/dash
+      data: [NANGO_DASHBOARD_PASSWORD, NANGO_ENCRYPTION_KEY, NANGO_SECRET_KEY]
+    dash-hermes:
+      key: geometry/dash
+      data: [API_SERVER_KEY]
+    dash-agent-env:
+      key: geometry/dash
+      data: [API_SERVER_KEY]
+    dash-agent-ssh:
+      key: geometry/dash
+      data:
+        PRIVATE_KEY: DASH_SANDBOX_PRIVATE_KEY
+    dash-sandbox-ssh:
+      key: geometry/dash
+      data:
+        PUBLIC_KEY: DASH_SANDBOX_PUBLIC_KEY
+    dash-github-app:
+      key: geometry/dash
+      data: [GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY]
+    dash-bedrock:
+      key: geometry/bedrock
+      extract: true
+    traefik-basic-auth:
+      key: geometry/auth
+      extract: true
+
+# Plain Secrets, for clusters with no External Secrets Operator.
+# Map of Secret name to its keys and values.
+secrets:
+  create: false
+  values: {}
+
+# An in-cluster pgvector, for clusters with no RDS. When enabled, the chart
+# also writes the DB URLs into configSecret.
+postgres:
+  enabled: false
+  image: pgvector/pgvector:pg16
+  storage: 5Gi
+
+nango:
+  image: nangohq/nango-server:hosted-0.71.13@sha256:1839c59a2d04479e884328b2852f5aedc7b7c24083f07a2b0381958a1fd83649
+  dbSsl: "true"
+
+agent:
+  image: nousresearch/hermes-agent:v2026.8.27
+  storage: 20Gi
+  dashboard:
+    enabled: true
+
+sandbox:
+  image: lscr.io/linuxserver/openssh-server:10.2_p1-r0-ls226
+  storage: 10Gi
+  ghVersion: "2.65.0"
+  ghArch: amd64

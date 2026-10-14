@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dash-nango
+  labels: {{- include "dash.labels" (list . "dash-nango") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {{- include "dash.selectorLabels" (list . "dash-nango") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dash.selectorLabels" (list . "dash-nango") | nindent 8 }}
+    spec:
+      containers:
+        - name: nango
+          image: {{ .Values.nango.image }}
+          ports:
+            - name: api
+              containerPort: 3003
+            - name: connect
+              containerPort: 3009
+          env:
+            - name: SERVER_RUN_MODE
+              value: DOCKERIZED
+            - name: SERVER_PORT
+              value: "3003"
+            - name: NANGO_DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.configSecret }}, key: NANGO_DATABASE_URL }
+            - name: NANGO_DB_SSL
+              value: {{ .Values.nango.dbSsl | quote }}
+            - name: NANGO_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef: { name: dash, key: NANGO_ENCRYPTION_KEY }
+            - name: NANGO_REDIS_URL
+              value: redis://dash-redis:6379/1
+            - name: NANGO_SERVER_URL
+              value: {{ include "dash.url" (list . "nango") }}
+            - name: NANGO_PUBLIC_CONNECT_URL
+              value: {{ include "dash.url" (list . "nangoConnect") }}
+            - name: FLAG_SERVE_CONNECT_UI
+              value: "true"
+            - name: FLAG_AUTH_ENABLED
+              value: "false"
+            - name: NANGO_DASHBOARD_USERNAME
+              value: admin
+            - name: NANGO_SECRET_KEY_PROD
+              valueFrom:
+                secretKeyRef: { name: dash, key: NANGO_SECRET_KEY }
+            - name: NANGO_DASHBOARD_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: dash, key: NANGO_DASHBOARD_PASSWORD }
+            - name: TELEMETRY
+              value: "false"
+          securityContext:
+            allowPrivilegeEscalation: false
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 1Gi }
+          readinessProbe:
+            httpGet: { path: /health, port: api }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: api }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dash-nango
+  labels: {{- include "dash.labels" (list . "dash-nango") | nindent 4 }}
+spec:
+  selector: {{- include "dash.selectorLabels" (list . "dash-nango") | nindent 4 }}
+  ports:
+    - name: api
+      port: 3003
+      targetPort: api
+    - name: connect
+      port: 3009
+      targetPort: connect

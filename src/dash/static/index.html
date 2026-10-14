@@ -27,6 +27,7 @@
 
   <main>
     <section id="tab-chat" class="tab active">
+      <loopy-animation id="loopy" state="idle"></loopy-animation>
       <div id="messages"></div>
       <form id="composer">
         <textarea id="input" rows="3" placeholder="Message hermes… (Enter sends, Shift+Enter is a new line)"></textarea>
@@ -61,6 +62,7 @@
     </section>
   </main>
 
+  <script type="module" src="/static/loopy/loopy.js"></script>
   <script type="module" src="/static/app.js"></script>
 </body>
 </html>

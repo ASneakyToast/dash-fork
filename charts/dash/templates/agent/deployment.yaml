@@ -1,0 +1,236 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dash-agent
+  labels: {{- include "dash.labels" (list . "dash-agent") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "dash.selectorLabels" (list . "dash-agent") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dash.selectorLabels" (list . "dash-agent") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/agent/config.yaml") . | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 90
+      initContainers:
+        # Copy config and the SSH key onto writable volumes owned by the
+        # hermes uid (10000). See apps/hermes-agent/base/profiles/opus/
+        # deployment.yaml for why the Secret can't be mounted directly.
+        - name: seed
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eux
+
+              echo "== config"
+              cp /etc/hermes/config.yaml /opt/data/config.yaml
+              mkdir -p /opt/data/cache/vision-tmp
+              chown -R 10000:10000 /opt/data/cache
+
+              echo "== ssh"
+              (
+                umask 077
+                tr -d '\r' < /etc/ssh-key-src/id_ed25519 > /opt/data/.ssh/id_ed25519
+                [ -z "$(tail -c1 /opt/data/.ssh/id_ed25519)" ] \
+                  || printf '\n' >> /opt/data/.ssh/id_ed25519
+                : > /opt/data/.ssh/known_hosts
+                cat > /opt/data/.ssh/config <<'CFG'
+              Host dash-sandbox dash-sandbox.{{ .Release.Namespace }}.svc.cluster.local
+                HostName dash-sandbox.{{ .Release.Namespace }}.svc.cluster.local
+                User agent
+                Port 2222
+                IdentityFile /opt/data/.ssh/id_ed25519
+                IdentitiesOnly yes
+                StrictHostKeyChecking accept-new
+                UserKnownHostsFile /opt/data/.ssh/known_hosts
+              CFG
+              )
+              chmod 0700 /opt/data/.ssh
+              chmod 0600 /opt/data/.ssh/id_ed25519 /opt/data/.ssh/known_hosts /opt/data/.ssh/config
+              chown -R 10000:10000 /opt/data/.ssh
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: ssh-home
+              mountPath: /opt/data/.ssh
+            - name: config
+              mountPath: /etc/hermes
+              readOnly: true
+            - name: ssh-key-src
+              mountPath: /etc/ssh-key-src
+              readOnly: true
+        # Python minor must match the hermes runtime (3.13).
+        - name: python-setup
+          image: python:3.13-slim
+          command:
+            - sh
+            - -c
+            - |
+              set -eux
+              pip install --no-cache-dir --disable-pip-version-check --target=/packages \
+                boto3 'anthropic>=0.39.0,<1'
+          volumeMounts:
+            - name: site-packages
+              mountPath: /packages
+      containers:
+        - name: hermes
+          image: {{ .Values.agent.image }}
+          args: ["gateway", "run", "--replace"]
+          env:
+            - name: API_SERVER_ENABLED
+              value: "true"
+            - name: API_SERVER_HOST
+              value: "0.0.0.0"
+            {{- if .Values.agent.dashboard.enabled }}
+            - name: HERMES_DASHBOARD
+              value: "1"
+            - name: HERMES_DASHBOARD_HOST
+              value: "0.0.0.0"
+            - name: HERMES_DASHBOARD_PORT
+              value: "9119"
+            - name: HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.configSecret }}
+                  key: HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+            - name: HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.configSecret }}
+                  key: HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH
+            - name: HERMES_DASHBOARD_BASIC_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.configSecret }}
+                  key: HERMES_DASHBOARD_BASIC_AUTH_SECRET
+            {{- end }}
+            - name: API_SERVER_MODEL_NAME
+              value: {{ .Values.hermes.model | quote }}
+            - name: PYTHONPATH
+              value: "/packages"
+            - name: TMPDIR
+              value: "/opt/data/cache/vision-tmp"
+            - name: API_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dash-agent-env
+                  key: API_SERVER_KEY
+          envFrom:
+            - secretRef:
+                name: dash-bedrock
+          ports:
+            - name: api
+              containerPort: 8642
+            {{- if .Values.agent.dashboard.enabled }}
+            - name: dashboard
+              containerPort: 9119
+            {{- end }}
+            - name: ssh
+              containerPort: 2222
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: site-packages
+              mountPath: /packages
+              readOnly: true
+            - name: ssh-home
+              mountPath: /opt/data/.ssh
+            # Hermes validates terminal.cwd locally even with the ssh backend.
+            - name: terminal-cwd-stub
+              mountPath: /config/workspace
+            # sshd as an s6 service, same layout as apps/hermes-agent.
+            - name: sshd
+              mountPath: /etc/s6-overlay/s6-rc.d/sshd/type
+              subPath: type
+            - name: sshd
+              mountPath: /etc/s6-overlay/s6-rc.d/sshd/run
+              subPath: run
+            - name: sshd
+              mountPath: /etc/s6-overlay/s6-rc.d/sshd/dependencies.d/base
+              subPath: empty
+            - name: sshd
+              mountPath: /etc/s6-overlay/s6-rc.d/user/contents.d/sshd
+              subPath: empty
+            - name: sshd
+              mountPath: /etc/hermes-sshd/sshd_config
+              subPath: sshd_config
+            # subPath, not a directory mount: sshd StrictModes refuses the
+            # Secret volume's writable directory ("bad ownership or modes").
+            - name: sshd-keys
+              mountPath: /etc/hermes-sshd-keys/authorized_keys
+              subPath: authorized_keys
+              readOnly: true
+          startupProbe:
+            httpGet: { path: /health, port: api }
+            periodSeconds: 2
+            failureThreshold: 90
+          readinessProbe:
+            httpGet: { path: /health, port: api }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: api }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          # Let in-flight SSE turns finish before SIGTERM.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 60"]
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: dash-agent-data
+        - name: config
+          configMap:
+            name: dash-agent-config
+        - name: site-packages
+          emptyDir: {}
+        - name: ssh-key-src
+          secret:
+            secretName: dash-agent-ssh
+            defaultMode: 0400
+            items:
+              - key: PRIVATE_KEY
+                path: id_ed25519
+                mode: 0400
+        - name: ssh-home
+          emptyDir: {}
+        - name: terminal-cwd-stub
+          emptyDir: {}
+        - name: sshd
+          configMap:
+            name: dash-agent-sshd
+            defaultMode: 0444
+            items:
+              - key: type
+                path: type
+              - key: run
+                path: run
+                mode: 0755
+              - key: sshd_config
+                path: sshd_config
+              - key: empty
+                path: empty
+        # The dash-sandbox public key, so the id_dash key that opens the
+        # sandbox opens the agent too.
+        - name: sshd-keys
+          secret:
+            secretName: dash-sandbox-ssh
+            defaultMode: 0444
+            items:
+              - key: PUBLIC_KEY
+                path: authorized_keys

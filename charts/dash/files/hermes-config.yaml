@@ -1,0 +1,48 @@
+# Seeded onto the PVC at /opt/data/config.yaml on every start. Derived
+# from apps/hermes-agent/base/profiles/opus/config.yaml without the
+# webhook, cron and plugin sections, which dash does not use.
+model:
+  default: global.anthropic.claude-opus-5-5
+  provider: bedrock
+  base_url: https://bedrock-runtime.us-east-1.amazonaws.com
+
+bedrock:
+  region: us-east-1
+
+agent:
+  reasoning_effort: low
+  api_max_retries: 1
+
+providers:
+  bedrock:
+    request_timeout_seconds: 600
+    stale_timeout_seconds: 90
+
+logging:
+  level: info
+
+# Commands run in dash-sandbox, which holds the Nango tokens under
+# /run/secrets/nango and a GitHub token under /run/secrets/github.
+# The agent pod itself never sees them.
+terminal:
+  backend: ssh
+  cwd: /config/workspace
+  timeout: 90
+  lifetime_seconds: 300
+  ssh_host: dash-sandbox.{{ .Release.Namespace }}.svc.cluster.local
+  ssh_user: agent
+  ssh_port: 2222
+  ssh_key: /opt/data/.ssh/id_ed25519
+
+# No file or code_execution: they run in this pod, not the sandbox, so
+# edits land in the empty terminal-cwd-stub instead of the repo checkout.
+toolsets:
+  - terminal
+  - web
+  - skills
+  - memory
+  - session_search
+  - todo
+
+security:
+  tirith_enabled: false

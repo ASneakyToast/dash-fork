@@ -70,6 +70,7 @@ async function loadConversations() {
           state.conversation = null;
           localStorage.removeItem("conversation");
           $("#messages").replaceChildren();
+          setLoopy("idle");
         }
         loadConversations();
       });
@@ -92,6 +93,7 @@ function bubble(role, text) {
 async function openConversation(id) {
   state.conversation = id;
   localStorage.setItem("conversation", id);
+  setLoopy("idle");
   document.querySelector('nav button[data-tab="chat"]').click();
   const messages = await api(`/api/conversations/${id}/messages`);
   $("#messages").replaceChildren();
@@ -122,6 +124,28 @@ function pulse() {
     ],
     { duration: 400, easing: "ease-out" },
   );
+}
+
+function setLoopy(loopyState, detail = "") {
+  const node = $("#loopy");
+  node.setAttribute("state", loopyState);
+  node.setAttribute("detail", detail);
+}
+
+function toolState(tool = "") {
+  if (/search/i.test(tool)) return "searching";
+  if (/read|extract|view|fetch/i.test(tool)) return "reading";
+  return "tool";
+}
+
+function loopyFor(ev) {
+  if (ev.kind === "reasoning") return ["thinking"];
+  if (ev.kind === "tool") return ev.status === "running" || !ev.status ? [toolState(ev.tool), ev.label || ev.tool] : null;
+  if (ev.kind === "delta") return ["writing"];
+  if (ev.kind === "status") return [$("#loopy").getAttribute("state") || "thinking", ev.message || ""];
+  if (ev.kind === "done") return ["done"];
+  if (ev.kind === "error") return ["error", ev.message || ""];
+  return null;
 }
 
 // Draws a reply's trace (thinking, tools, status) and text from its events, live or replayed.
@@ -178,13 +202,15 @@ function renderer(node) {
   };
 }
 
-function follow(jobId, node) {
+function follow(jobId, node, conversation) {
   return new Promise((resolve) => {
     const source = new EventSource(`/api/jobs/${jobId}/events`);
     const render = renderer(node);
     source.onmessage = (e) => {
       const ev = JSON.parse(e.data);
       if (ev.kind === "delta") pulse();
+      const next = conversation === state.conversation && loopyFor(ev);
+      if (next) setLoopy(...next);
       render(ev);
       if (ev.kind === "done" || ev.kind === "error") {
         source.close();
@@ -206,14 +232,17 @@ $("#composer").addEventListener("submit", async (e) => {
   $("#input").value = "";
   bubble("user", content);
   const node = bubble("assistant", "…");
+  const conversation = state.conversation;
+  setLoopy("thinking");
   try {
-    const { job_id } = await api(`/api/conversations/${state.conversation}/messages`, {
+    const { job_id } = await api(`/api/conversations/${conversation}/messages`, {
       method: "POST",
       body: { content },
     });
     loadConversations();
-    await follow(job_id, node);
+    await follow(job_id, node, conversation);
   } catch (err) {
+    if (conversation === state.conversation) setLoopy("error", String(err));
     node.classList.add("error");
     node.textContent = String(err);
   }

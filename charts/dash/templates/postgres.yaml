@@ -1,0 +1,75 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dash-postgres-init
+  labels: {{- include "dash.labels" (list . "dash-postgres") | nindent 4 }}
+data:
+  init.sql: {{ .Files.Get "files/postgres-init.sql" | quote }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dash-postgres
+  labels: {{- include "dash.labels" (list . "dash-postgres") | nindent 4 }}
+spec:
+  serviceName: dash-postgres
+  replicas: 1
+  selector:
+    matchLabels: {{- include "dash.selectorLabels" (list . "dash-postgres") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dash.selectorLabels" (list . "dash-postgres") | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          env:
+            - name: POSTGRES_USER
+              value: dash
+            - name: POSTGRES_PASSWORD
+              value: dash
+            - name: POSTGRES_DB
+              value: dash
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec: { command: [pg_isready, -U, dash, -d, dash] }
+            periodSeconds: 5
+      volumes:
+        - name: init
+          configMap:
+            name: dash-postgres-init
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: {{ .Values.storageClassName }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dash-postgres
+  labels: {{- include "dash.labels" (list . "dash-postgres") | nindent 4 }}
+spec:
+  selector: {{- include "dash.selectorLabels" (list . "dash-postgres") | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+{{- end }}

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nango-refresher
+  labels: {{- include "dash.labels" (list . "dash-sandbox") | nindent 4 }}
+data:
+  nango_refresher.py: {{ .Files.Get "files/nango_refresher.py" | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: github-refresher
+  labels: {{- include "dash.labels" (list . "dash-sandbox") | nindent 4 }}
+data:
+  github_refresher.sh: {{ .Files.Get "files/github_refresher.sh" | quote }}

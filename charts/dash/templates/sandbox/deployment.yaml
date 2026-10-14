@@ -1,0 +1,230 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dash-sandbox
+  labels: {{- include "dash.labels" (list . "dash-sandbox") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "dash.selectorLabels" (list . "dash-sandbox") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dash.selectorLabels" (list . "dash-sandbox") | nindent 8 }}
+      annotations:
+        checksum/scripts: {{ include (print $.Template.BasePath "/sandbox/scripts.yaml") . | sha256sum }}
+    spec:
+      initContainers:
+        # Hermes' ssh backend prepends `cd /config/workspace` to every
+        # command, so the directory must exist before the first call.
+        - name: seed-rc
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /config/workspace
+              for f in /config/.bashrc /config/.bash_profile /config/.profile; do
+                cat > "$f" <<'RC'
+              export NANGO_CREDENTIALS_DIR=/run/secrets/nango
+              # A DEBUG trap, not PROMPT_COMMAND: Hermes runs non-interactive
+              # `ssh host cmd`, and the token rotates mid-session.
+              _refresh_gh_token() {
+                if [ -r /run/secrets/github/token ]; then
+                  GITHUB_TOKEN="$(cat /run/secrets/github/token)"
+                  export GITHUB_TOKEN
+                fi
+              }
+              _refresh_gh_token
+              if [ -n "${BASH_VERSION:-}" ]; then
+                trap _refresh_gh_token DEBUG
+              fi
+              RC
+              done
+              # gh reads GITHUB_TOKEN, so git pushes over https with it.
+              cat > /config/.gitconfig <<'GIT'
+              [user]
+                name = dash-agent
+                email = dash-agent@users.noreply.github.com
+              [credential "https://github.com"]
+                helper =
+                helper = !/usr/local/bin/gh auth git-credential
+              GIT
+          volumeMounts:
+            - name: data
+              mountPath: /config
+        - name: init-tools
+          image: alpine:3.20
+          env:
+            - name: GH_VERSION
+              value: {{ .Values.sandbox.ghVersion | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              apk add --no-cache curl tar
+
+              install_gh() {
+                curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_{{ .Values.sandbox.ghArch }}.tar.gz" \
+                  | tar -xz -C /tmp
+                install -m 0755 "/tmp/gh_${GH_VERSION}_linux_{{ .Values.sandbox.ghArch }}/bin/gh" /tools/gh
+              }
+
+              install_gh
+          volumeMounts:
+            - name: tools
+              mountPath: /tools
+      containers:
+        - name: sshd
+          image: {{ .Values.sandbox.image }}
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "Etc/UTC"
+            - name: USER_NAME
+              value: "agent"
+            - name: SUDO_ACCESS
+              value: "true"
+            - name: PASSWORD_ACCESS
+              value: "false"
+            - name: PUBLIC_KEY_FILE
+              value: "/pubkey/PUBLIC_KEY"
+          ports:
+            - name: ssh
+              containerPort: 2222
+          # Non-interactive ssh sessions don't source rc files, and the
+          # tools are multi-file Alpine packages, so install into the rootfs.
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - apk add --no-cache git ripgrep fd python3 py3-pip yq && ln -sf /tools/* /usr/local/bin/
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: pubkey
+              mountPath: /pubkey
+              readOnly: true
+            - name: nango-credentials
+              mountPath: /run/secrets/nango
+              readOnly: true
+            - name: github-token
+              mountPath: /run/secrets/github
+              readOnly: true
+            - name: tools
+              mountPath: /tools
+              readOnly: true
+          # Not tcpSocket: sshd listens before postStart's apk add finishes,
+          # and early commands then find no git or python3.
+          readinessProbe:
+            exec:
+              command: [sh, -c, "nc -z localhost 2222 && command -v git python3 gh"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+        # Holds NANGO_SECRET_KEY so the sshd container (and so the agent's
+        # shell) never does. Only the per-connection credential files cross
+        # over, through the shared tmpfs.
+        - name: nango-refresher
+          image: python:3.13-slim
+          command: ["python", "/scripts/nango_refresher.py"]
+          env:
+            - name: NANGO_URL
+              value: "http://dash-nango:3003"
+            - name: NANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dash
+                  key: NANGO_SECRET_KEY
+            - name: OUT_DIR
+              value: "/run/secrets/nango"
+            - name: INTERVAL_SECONDS
+              value: "300"
+          volumeMounts:
+            - name: nango-credentials
+              mountPath: /run/secrets/nango
+            - name: nango-refresher
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+        # Holds the GitHub App private key so sshd never does. Only the
+        # short-lived installation token crosses over.
+        - name: github-refresher
+          image: alpine:3.20
+          command:
+            - sh
+            - -c
+            - apk add --no-cache openssl curl jq && exec sh /scripts/github_refresher.sh
+          env:
+            - name: APP_DIR
+              value: "/github-app"
+            - name: OUT_DIR
+              value: "/run/secrets/github"
+            - name: INTERVAL_SECONDS
+              value: "1800"
+          volumeMounts:
+            - name: github-token
+              mountPath: /run/secrets/github
+            - name: github-app
+              mountPath: /github-app
+              readOnly: true
+            - name: github-refresher
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: dash-sandbox-data
+        - name: pubkey
+          secret:
+            secretName: dash-sandbox-ssh
+            defaultMode: 0400
+        - name: tools
+          emptyDir: {}
+        - name: nango-credentials
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: nango-refresher
+          configMap:
+            name: nango-refresher
+            defaultMode: 0444
+        - name: github-token
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        - name: github-app
+          secret:
+            secretName: dash-github-app
+            defaultMode: 0400
+        - name: github-refresher
+          configMap:
+            name: github-refresher
+            defaultMode: 0444

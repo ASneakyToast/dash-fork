@@ -63,6 +63,7 @@ h2 { font-size: 16px; margin: 12px 0 0; }
   body.sidebar-collapsed aside header { padding: 12px 8px; justify-content: center; }
   body.sidebar-collapsed aside header > :not(#toggle-sidebar), body.sidebar-collapsed #sidebar-body { display: none; }
 }
+#loopy { flex-shrink: 0; align-self: flex-start; color: var(--muted); }
 #pulse { align-self: center; flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
 @media (pointer: coarse) {
   textarea, input { font-size: 16px; }

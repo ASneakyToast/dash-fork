@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dash-env
+  labels: {{- include "dash.labels" (list . "dash-env") | nindent 4 }}
+data:
+  PUBLIC_URL: {{ include "dash.url" (list . "dash") }}
+  REDIS_URL: redis://dash-redis:6379/0
+  HERMES_BASE_URL: http://dash-agent:8642/v1
+  HERMES_MODEL: {{ .Values.hermes.model }}
+  NANGO_URL: http://dash-nango:3003
+  NANGO_PUBLIC_URL: {{ include "dash.url" (list . "nango") }}
+  NANGO_CONNECT_URL: {{ include "dash.url" (list . "nangoConnect") }}
