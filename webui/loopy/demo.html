@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>loopy demo</title>
+  <script type="module" src="./dist/loopy.js"></script>
+</head>
+<body style="font-family: system-ui; padding: 2rem; display: grid; gap: 1rem;">
+  <loopy-animation id="agent" state="idle"></loopy-animation>
+  <div id="buttons"></div>
+  <script type="module">
+    import { LOOPY_STATES } from "./dist/loopy.js";
+    const agent = document.getElementById("agent");
+    const buttons = document.getElementById("buttons");
+    LOOPY_STATES.forEach((state) => {
+      const button = document.createElement("button");
+      button.textContent = state;
+      button.onclick = () => agent.setState(state, state === "tool" ? "web_search" : "");
+      buttons.append(button);
+    });
+    agent.addEventListener("loopy-change", (event) => console.log(event.detail));
+  </script>
+</body>
+</html>
