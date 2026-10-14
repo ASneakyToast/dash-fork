@@ -20,6 +20,7 @@ const state = { conversation: null, config: {} };
 // Tabs
 document.querySelectorAll("nav button").forEach((btn) =>
   btn.addEventListener("click", () => {
+    setConversationsOpen(false);
     document.querySelectorAll("nav button, .tab").forEach((n) => n.classList.remove("active"));
     btn.classList.add("active");
     $(`#tab-${btn.dataset.tab}`).classList.add("active");
@@ -32,6 +33,15 @@ document.querySelectorAll("nav button").forEach((btn) =>
 );
 
 // Conversations
+function setConversationsOpen(open) {
+  $("aside").classList.toggle("open", open);
+  $("#toggle-conversations").setAttribute("aria-expanded", String(open));
+}
+
+$("#toggle-conversations").addEventListener("click", () =>
+  setConversationsOpen(!$("aside").classList.contains("open")),
+);
+
 async function loadConversations() {
   const list = await api("/api/conversations");
   $("#conversations").replaceChildren(
@@ -55,6 +65,7 @@ function bubble(role, text) {
 async function openConversation(id) {
   state.conversation = id;
   localStorage.setItem("conversation", id);
+  document.querySelector('nav button[data-tab="chat"]').click();
   const messages = await api(`/api/conversations/${id}/messages`);
   $("#messages").replaceChildren();
   messages.forEach((m) => bubble(m.role, m.content));

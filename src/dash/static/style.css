@@ -40,3 +40,31 @@ textarea, input { flex: 1; font: inherit; padding: 8px 10px; border: 1px solid v
 h2 { font-size: 16px; margin: 12px 0 0; }
 #github-create { display: flex; gap: 8px; }
 #github-create input { flex: 1; }
+#memory-list li > div:first-child, #app-list li > div:first-child, #github-list li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+#toggle-conversations { display: none; }
+@media (pointer: coarse) {
+  textarea, input { font-size: 16px; }
+}
+@media (max-width: 700px) {
+  body { flex-direction: column; height: 100dvh; }
+  aside { width: 100%; border-right: 0; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  aside header { padding: 8px 12px; gap: 8px; }
+  aside header h1 { flex: 1; }
+  #toggle-conversations { display: inline-block; }
+  nav { padding: 0 12px 8px; }
+  nav button { flex: 1; }
+  button { min-height: 40px; }
+  #new-chat, #conversations { display: none; }
+  aside.open #new-chat { display: block; }
+  aside.open #conversations { display: block; max-height: 40dvh; }
+  #new-chat { margin: 0 12px 8px; }
+  #conversations li { padding: 12px; }
+  main { flex: 1; min-height: 0; }
+  .tab { padding: 12px; overflow-y: auto; }
+  #tab-chat { overflow-y: visible; }
+  textarea, input { min-width: 0; }
+  .msg { max-width: 92%; }
+  #composer { align-items: flex-end; }
+  #memory-add, #github-create { flex-wrap: wrap; }
+  #memory-add input, #github-create input { flex-basis: 100%; }
+}
