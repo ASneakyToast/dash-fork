@@ -132,30 +132,32 @@ def create_app(
         if not await store.delete_memory(memory_id):
             raise HTTPException(404, "No such memory.")
 
-    def need_nango() -> None:
+    @asynccontextmanager
+    async def nango_errors() -> AsyncIterator[None]:
         if not nango.enabled:
             raise HTTPException(503, "Nango is not configured.")
+        try:
+            yield
+        except httpx.HTTPError as ex:
+            raise HTTPException(502, f"Nango: {ex}") from ex
 
     @app.get("/api/connections")
     async def connections() -> dict[str, Any]:
-        need_nango()
-        try:
+        async with nango_errors():
             return {
                 "integrations": await nango.integrations(),
                 "connections": await nango.connections(),
             }
-        except httpx.HTTPError as ex:
-            raise HTTPException(502, f"Nango: {ex}") from ex
 
     @app.post("/api/connections/session")
     async def connect_session() -> dict[str, str]:
-        need_nango()
-        return {"token": await nango.connect_session()}
+        async with nango_errors():
+            return {"token": await nango.connect_session()}
 
     @app.delete("/api/connections/{provider_config_key}/{connection_id}", status_code=204)
     async def disconnect(provider_config_key: str, connection_id: str) -> None:
-        need_nango()
-        await nango.delete_connection(connection_id, provider_config_key)
+        async with nango_errors():
+            await nango.delete_connection(connection_id, provider_config_key)
 
     for router in routers:
         app.include_router(router)

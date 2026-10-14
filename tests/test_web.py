@@ -1,6 +1,7 @@
 from typing import cast
 
 import fakeredis
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -67,3 +68,24 @@ def test_connections_need_nango(client: TestClient) -> None:
 
 def test_bad_job_id_rejected(client: TestClient) -> None:
     assert client.get("/api/jobs/a:b/events").status_code == 400
+
+
+def test_nango_errors_become_502(store: FakeStore) -> None:
+    def deny(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"error": "unauthorized"})
+
+    nango = Nango("http://nango.invalid", "bad-key")
+    nango._client = httpx.AsyncClient(
+        base_url="http://nango.invalid", transport=httpx.MockTransport(deny)
+    )
+    app = create_app(
+        store=cast("Store", store),
+        queue=Queue(fakeredis.FakeAsyncRedis(decode_responses=True)),
+        embedder=FakeEmbedder(),
+        nango=nango,
+    )
+    client = TestClient(app)
+    for method, path in [("GET", "/api/connections"), ("POST", "/api/connections/session")]:
+        res = client.request(method, path)
+        assert res.status_code == 502
+        assert "401" in res.json()["detail"]

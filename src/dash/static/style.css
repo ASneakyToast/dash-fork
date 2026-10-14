@@ -30,6 +30,7 @@ main { flex: 1; display: flex; min-width: 0; }
 .msg.user { align-self: flex-end; background: var(--user); }
 .msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); }
 .msg.error { border-color: #dc2626; color: #dc2626; }
+li.error { color: #dc2626; }
 .recalled { font-size: 12px; color: var(--muted); margin-top: 6px; }
 #composer, #memory-add { display: flex; gap: 8px; }
 textarea, input { flex: 1; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }

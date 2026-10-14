@@ -172,7 +172,13 @@ async function loadApps() {
     $("#app-list").replaceChildren(el("li", { textContent: "Nango is not configured." }));
     return;
   }
-  const { connections } = await api("/api/connections");
+  let connections;
+  try {
+    ({ connections } = await api("/api/connections"));
+  } catch (err) {
+    $("#app-list").replaceChildren(el("li", { className: "error", textContent: err.message }));
+    return;
+  }
   $("#app-list").replaceChildren(
     ...connections.map((c) => {
       const del = el("button", { textContent: "Disconnect" });
@@ -189,7 +195,13 @@ async function loadApps() {
 
 $("#connect").addEventListener("click", async () => {
   const { default: Nango } = await import("https://esm.sh/@nangohq/frontend@0.69");
-  const { token } = await api("/api/connections/session", { method: "POST" });
+  let token;
+  try {
+    ({ token } = await api("/api/connections/session", { method: "POST" }));
+  } catch (err) {
+    $("#app-list").replaceChildren(el("li", { className: "error", textContent: err.message }));
+    return;
+  }
   const nango = new Nango({ host: state.config.nango_host, connectSessionToken: token });
   nango.openConnectUI({
     baseURL: state.config.nango_connect_url || undefined,
