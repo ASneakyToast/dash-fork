@@ -150,6 +150,7 @@ services:
       PUBLIC_KEY_FILE: /keys/id_ed25519.pub
     volumes:
       - sandbox:/config
+      - hermes-workspace:/config/workspace
       - hermes-ssh:/keys:ro
       - ./dev/sandbox-init.sh:/custom-cont-init.d/10-tools:ro
     healthcheck:
