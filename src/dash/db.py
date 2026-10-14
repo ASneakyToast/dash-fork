@@ -59,6 +59,8 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(Text)
     content: Mapped[str] = mapped_column(Text)
+    # The ordered stream behind an assistant reply: text, reasoning, tool, status, memories.
+    events: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -176,8 +178,16 @@ class Store:
             )
             return rows.all()
 
-    async def add_message(self, conversation_id: uuid.UUID, role: str, content: str) -> Message:
-        message = Message(conversation_id=conversation_id, role=role, content=content)
+    async def add_message(
+        self,
+        conversation_id: uuid.UUID,
+        role: str,
+        content: str,
+        events: Sequence[dict[str, Any]] = (),
+    ) -> Message:
+        message = Message(
+            conversation_id=conversation_id, role=role, content=content, events=list(events)
+        )
         async with self._session() as session, session.begin():
             session.add(message)
             conversation = await session.get(Conversation, conversation_id)

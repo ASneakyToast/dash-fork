@@ -73,7 +73,23 @@ async def test_reasoning_and_tool_progress_are_streamed_in_order() -> None:
         {"kind": "delta", "text": "Two files."},
         {"kind": "status", "message": "ok"},
     ]
-    assert [m.content for m in await store.messages(conv_id)][-1] == "Two files."
+    saved = (await store.messages(conv_id))[-1]
+    assert saved.content == "Two files."
+    assert saved.events == got
+
+
+async def test_saved_events_merge_text_runs() -> None:
+    chat = FakeChat(["a" * 40, "b" * 40, Delta("tool", data={"tool": "t"}), "c"])
+    worker, store, _, conv_id, job = await setup(chat, [])
+
+    await worker.handle(job)
+
+    saved = (await store.messages(conv_id))[-1]
+    assert saved.events == [
+        {"kind": "delta", "text": "a" * 40 + "b" * 40},
+        {"kind": "tool", "tool": "t"},
+        {"kind": "delta", "text": "c"},
+    ]
 
 
 async def test_duplicate_fact_is_not_stored_twice() -> None:

@@ -1,3 +1,4 @@
+import uuid
 from typing import cast
 
 import fakeredis
@@ -99,3 +100,13 @@ def test_nango_errors_become_502(store: FakeStore) -> None:
         res = client.request(method, path)
         assert res.status_code == 502
         assert "401" in res.json()["detail"]
+
+
+async def test_messages_include_saved_events(client: TestClient, store: FakeStore) -> None:
+    conv = client.post("/api/conversations").json()
+    events = [{"kind": "tool", "tool": "terminal"}, {"kind": "delta", "text": "ok"}]
+    await store.add_message(uuid.UUID(conv["id"]), "assistant", "ok", events)
+
+    got = client.get(f"/api/conversations/{conv['id']}/messages").json()
+
+    assert got == [{"id": got[0]["id"], "role": "assistant", "content": "ok", "events": events}]

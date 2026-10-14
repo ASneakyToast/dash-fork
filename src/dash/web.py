@@ -86,7 +86,7 @@ def create_app(
     @app.get("/api/conversations/{conversation_id}/messages")
     async def messages(conversation_id: uuid.UUID) -> list[dict[str, Any]]:
         return [
-            {"id": m.id, "role": m.role, "content": m.content}
+            {"id": m.id, "role": m.role, "content": m.content, "events": m.events or []}
             for m in await store.messages(conversation_id)
         ]
 

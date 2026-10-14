@@ -5,7 +5,7 @@ import logging
 import socket
 import uuid
 from collections.abc import AsyncIterator, Mapping, Sequence
-from typing import Protocol
+from typing import Any, Protocol
 
 from redis.exceptions import RedisError
 
@@ -25,6 +25,14 @@ log = logging.getLogger(__name__)
 # Coalesce deltas so a fast model doesn't write one Redis entry per token.
 FLUSH_CHARS = 48
 RETRY_SECONDS = 2
+
+
+def record(log: list[dict[str, Any]], kind: str, data: Mapping[str, Any]) -> None:
+    """Append an event, merging runs of text or reasoning into one entry."""
+    if kind in ("delta", "reasoning") and log and log[-1]["kind"] == kind:
+        log[-1]["text"] += data.get("text", "")
+    else:
+        log.append({"kind": kind, **data})
 
 
 class Chat(Protocol):
@@ -80,9 +88,16 @@ class Worker:
             await self.queue.emit(job.job_id, "error", message="No user message to answer.")
             return
         user_text = history[-1].content
+        # Everything the UI is shown, in order, so the reply can be rebuilt after a reload.
+        trail: list[dict[str, Any]] = []
+
+        async def emit(kind: str, **data: Any) -> None:
+            await self.queue.emit(job.job_id, kind, **data)
+            record(trail, kind, data)
+
         memories = await self.recall(user_text)
         if memories:
-            await self.queue.emit(job.job_id, "memories", items=memories)
+            await emit("memories", items=memories)
 
         messages: list[dict[str, str]] = []
         system = system_prompt(memories)
@@ -96,7 +111,7 @@ class Worker:
 
         async def flush(kind: str) -> None:
             if buffers[kind]:
-                await self.queue.emit(job.job_id, events[kind], text=buffers[kind])
+                await emit(events[kind], text=buffers[kind])
                 buffers[kind] = ""
 
         try:
@@ -112,7 +127,7 @@ class Worker:
                 else:
                     await flush("reasoning")
                     await flush("text")
-                    await self.queue.emit(job.job_id, delta.kind, **delta.data)
+                    await emit(delta.kind, **delta.data)
         except Exception as ex:
             log.exception("hermes call failed")
             await self.queue.emit(job.job_id, "error", message=f"hermes: {ex}")
@@ -121,7 +136,7 @@ class Worker:
         await flush("text")
 
         text = "".join(reply)
-        message = await self.store.add_message(conversation_id, "assistant", text)
+        message = await self.store.add_message(conversation_id, "assistant", text, trail)
         await self.queue.emit(job.job_id, "done", message_id=message.id)
         stored = await self.remember(user_text, text)
         if stored:
