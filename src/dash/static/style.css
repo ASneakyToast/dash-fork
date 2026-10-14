@@ -20,7 +20,12 @@ button:hover { border-color: var(--accent); }
 nav button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 #new-chat { margin: 0 10px 8px; }
 ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
-#conversations li { padding: 8px 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#conversations li { padding: 8px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+#conversations li span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#conversations li .delete { border: none; background: none; padding: 0 4px; opacity: 0; color: inherit; }
+#conversations li:hover .delete, #conversations li .delete:focus { opacity: 0.6; }
+#conversations li .delete:hover { opacity: 1; color: var(--accent); }
+@media (hover: none) { #conversations li .delete { opacity: 0.6; } }
 #conversations li.active, #conversations li:hover { background: var(--bg); }
 main { flex: 1; display: flex; min-width: 0; }
 .tab { display: none; flex: 1; flex-direction: column; padding: 16px; gap: 12px; min-width: 0; }

@@ -46,7 +46,20 @@ async function loadConversations() {
   const list = await api("/api/conversations");
   $("#conversations").replaceChildren(
     ...list.map((c) => {
-      const li = el("li", { textContent: c.title, title: c.title });
+      const del = el("button", { className: "delete", textContent: "×", title: "Delete conversation" });
+      del.setAttribute("aria-label", `Delete ${c.title}`);
+      del.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        if (!confirm(`Delete "${c.title}"?`)) return;
+        await api(`/api/conversations/${c.id}`, { method: "DELETE" });
+        if (c.id === state.conversation) {
+          state.conversation = null;
+          localStorage.removeItem("conversation");
+          $("#messages").replaceChildren();
+        }
+        loadConversations();
+      });
+      const li = el("li", { title: c.title }, el("span", { textContent: c.title }), del);
       if (c.id === state.conversation) li.classList.add("active");
       li.addEventListener("click", () => openConversation(c.id));
       return li;

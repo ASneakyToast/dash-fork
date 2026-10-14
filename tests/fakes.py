@@ -31,6 +31,12 @@ class FakeStore:
     async def conversation(self, conversation_id: uuid.UUID) -> Conversation | None:
         return self.convs.get(conversation_id)
 
+    async def delete_conversation(self, conversation_id: uuid.UUID) -> bool:
+        if self.convs.pop(conversation_id, None) is None:
+            return False
+        self.msgs = [m for m in self.msgs if m.conversation_id != conversation_id]
+        return True
+
     async def messages(self, conversation_id: uuid.UUID) -> list[Message]:
         return [m for m in self.msgs if m.conversation_id == conversation_id]
 

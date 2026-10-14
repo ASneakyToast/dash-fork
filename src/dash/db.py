@@ -159,6 +159,14 @@ class Store:
         async with self._session() as session:
             return await session.get(Conversation, conversation_id)
 
+    async def delete_conversation(self, conversation_id: uuid.UUID) -> bool:
+        """Delete a conversation; its messages go with it via ON DELETE CASCADE."""
+        async with self._session() as session, session.begin():
+            result = await session.execute(
+                delete(Conversation).where(Conversation.id == conversation_id)
+            )
+            return bool(cast("CursorResult[Any]", result).rowcount)
+
     async def messages(self, conversation_id: uuid.UUID) -> Sequence[Message]:
         async with self._session() as session:
             rows = await session.scalars(

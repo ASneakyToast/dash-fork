@@ -50,6 +50,16 @@ def test_send_to_unknown_conversation_is_404(client: TestClient) -> None:
     assert client.post(url, json={"content": "hi"}).status_code == 404
 
 
+def test_delete_conversation(client: TestClient, store: FakeStore) -> None:
+    conv = client.post("/api/conversations").json()
+    client.post(f"/api/conversations/{conv['id']}/messages", json={"content": "hi"})
+
+    assert client.delete(f"/api/conversations/{conv['id']}").status_code == 204
+    assert client.get("/api/conversations").json() == []
+    assert store.msgs == []
+    assert client.delete(f"/api/conversations/{conv['id']}").status_code == 404
+
+
 def test_memories_add_search_delete(client: TestClient) -> None:
     created = client.post("/api/memories", json={"content": "The user likes tea."}).json()
 

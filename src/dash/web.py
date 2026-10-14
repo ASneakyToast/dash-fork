@@ -78,6 +78,11 @@ def create_app(
         conversation = await store.create_conversation()
         return {"id": str(conversation.id), "title": conversation.title}
 
+    @app.delete("/api/conversations/{conversation_id}", status_code=204)
+    async def delete_conversation(conversation_id: uuid.UUID) -> None:
+        if not await store.delete_conversation(conversation_id):
+            raise HTTPException(404, "No such conversation.")
+
     @app.get("/api/conversations/{conversation_id}/messages")
     async def messages(conversation_id: uuid.UUID) -> list[dict[str, Any]]:
         return [
