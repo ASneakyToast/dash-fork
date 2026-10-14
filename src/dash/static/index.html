@@ -9,10 +9,12 @@
 <body>
   <aside>
     <header>
+      <button type="button" id="toggle-sidebar" aria-expanded="true" aria-controls="sidebar-body" title="Collapse sidebar">«</button>
       <h1>dash</h1>
       <span id="queue" title="Job queue">…</span>
       <button type="button" id="toggle-conversations" aria-expanded="false" aria-controls="conversations">Chats</button>
     </header>
+    <div id="sidebar-body">
     <nav>
       <button data-tab="chat" class="active">Chat</button>
       <button data-tab="memories">Memories</button>
@@ -20,6 +22,7 @@
     </nav>
     <button id="new-chat">+ New conversation</button>
     <ul id="conversations"></ul>
+    </div>
   </aside>
 
   <main>
@@ -27,6 +30,7 @@
       <div id="messages"></div>
       <form id="composer">
         <textarea id="input" rows="3" placeholder="Message hermes… (Enter sends, Shift+Enter is a new line)"></textarea>
+        <span id="pulse" title="Pulses on every streamed text event" aria-hidden="true"></span>
         <button type="submit">Send</button>
       </form>
     </section>

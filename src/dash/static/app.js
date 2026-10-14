@@ -42,6 +42,20 @@ $("#toggle-conversations").addEventListener("click", () =>
   setConversationsOpen(!$("aside").classList.contains("open")),
 );
 
+function setSidebarCollapsed(collapsed) {
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  const btn = $("#toggle-sidebar");
+  btn.setAttribute("aria-expanded", String(!collapsed));
+  btn.textContent = collapsed ? "»" : "«";
+  btn.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  localStorage.setItem("sidebarCollapsed", collapsed ? "1" : "");
+}
+
+$("#toggle-sidebar").addEventListener("click", () =>
+  setSidebarCollapsed(!document.body.classList.contains("sidebar-collapsed")),
+);
+setSidebarCollapsed(Boolean(localStorage.getItem("sidebarCollapsed")));
+
 async function loadConversations() {
   const list = await api("/api/conversations");
   $("#conversations").replaceChildren(
@@ -92,6 +106,16 @@ $("#new-chat").addEventListener("click", async () => {
 });
 
 // Sending and streaming
+function pulse() {
+  $("#pulse").animate(
+    [
+      { transform: "scale(1.6)", background: "var(--accent)", boxShadow: "0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent)" },
+      { transform: "scale(1)", background: "var(--line)", boxShadow: "0 0 0 0 transparent" },
+    ],
+    { duration: 400, easing: "ease-out" },
+  );
+}
+
 function follow(jobId, node) {
   return new Promise((resolve) => {
     const source = new EventSource(`/api/jobs/${jobId}/events`);
@@ -117,6 +141,7 @@ function follow(jobId, node) {
       const ev = JSON.parse(e.data);
       if (ev.kind === "delta") {
         settle();
+        pulse();
         text += ev.text;
         node.textContent = text;
       } else if (ev.kind === "reasoning") {
