@@ -1,6 +1,8 @@
+import uuid
 from typing import cast
 
 import fakeredis
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -49,6 +51,16 @@ def test_send_to_unknown_conversation_is_404(client: TestClient) -> None:
     assert client.post(url, json={"content": "hi"}).status_code == 404
 
 
+def test_delete_conversation(client: TestClient, store: FakeStore) -> None:
+    conv = client.post("/api/conversations").json()
+    client.post(f"/api/conversations/{conv['id']}/messages", json={"content": "hi"})
+
+    assert client.delete(f"/api/conversations/{conv['id']}").status_code == 204
+    assert client.get("/api/conversations").json() == []
+    assert store.msgs == []
+    assert client.delete(f"/api/conversations/{conv['id']}").status_code == 404
+
+
 def test_memories_add_search_delete(client: TestClient) -> None:
     created = client.post("/api/memories", json={"content": "The user likes tea."}).json()
 
@@ -67,3 +79,34 @@ def test_connections_need_nango(client: TestClient) -> None:
 
 def test_bad_job_id_rejected(client: TestClient) -> None:
     assert client.get("/api/jobs/a:b/events").status_code == 400
+
+
+def test_nango_errors_become_502(store: FakeStore) -> None:
+    def deny(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"error": "unauthorized"})
+
+    nango = Nango("http://nango.invalid", "bad-key")
+    nango._client = httpx.AsyncClient(
+        base_url="http://nango.invalid", transport=httpx.MockTransport(deny)
+    )
+    app = create_app(
+        store=cast("Store", store),
+        queue=Queue(fakeredis.FakeAsyncRedis(decode_responses=True)),
+        embedder=FakeEmbedder(),
+        nango=nango,
+    )
+    client = TestClient(app)
+    for method, path in [("GET", "/api/connections"), ("POST", "/api/connections/session")]:
+        res = client.request(method, path)
+        assert res.status_code == 502
+        assert "401" in res.json()["detail"]
+
+
+async def test_messages_include_saved_events(client: TestClient, store: FakeStore) -> None:
+    conv = client.post("/api/conversations").json()
+    events = [{"kind": "tool", "tool": "terminal"}, {"kind": "delta", "text": "ok"}]
+    await store.add_message(uuid.UUID(conv["id"]), "assistant", "ok", events)
+
+    got = client.get(f"/api/conversations/{conv['id']}/messages").json()
+
+    assert got == [{"id": got[0]["id"], "role": "assistant", "content": "ok", "events": events}]

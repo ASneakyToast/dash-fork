@@ -7,6 +7,7 @@ import pytest
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from dash.db import Store
+from dash.hermes import Delta
 from dash.plugins import Plugins, discover
 from dash.queue import Job, Queue
 from dash.worker import Worker
@@ -55,6 +56,46 @@ async def test_reply_is_streamed_saved_and_memories_learned() -> None:
     assert chat.seen[0][0]["role"] == "system"
     assert "what do I like?" in chat.seen[0][0]["content"]
     assert [m.content for m in store.mems][-1] == "The user likes tea."
+
+
+async def test_reasoning_and_tool_progress_are_streamed_in_order() -> None:
+    tool = {"tool": "terminal", "label": "ls", "toolCallId": "c1", "status": "running"}
+    chat = FakeChat(
+        [
+            Delta("reasoning", "Let me look."),
+            Delta("tool", data=tool),
+            "Two files.",
+            Delta("status", data={"message": "ok"}),
+        ]
+    )
+    worker, store, queue, conv_id, job = await setup(chat, [])
+
+    await worker.handle(job)
+
+    got = [e for e in await events(queue) if e["kind"] != "done"]
+    assert got == [
+        {"kind": "reasoning", "text": "Let me look."},
+        {"kind": "tool", **tool},
+        {"kind": "delta", "text": "Two files."},
+        {"kind": "status", "message": "ok"},
+    ]
+    saved = (await store.messages(conv_id))[-1]
+    assert saved.content == "Two files."
+    assert saved.events == got
+
+
+async def test_saved_events_merge_text_runs() -> None:
+    chat = FakeChat(["a" * 40, "b" * 40, Delta("tool", data={"tool": "t"}), "c"])
+    worker, store, _, conv_id, job = await setup(chat, [])
+
+    await worker.handle(job)
+
+    saved = (await store.messages(conv_id))[-1]
+    assert saved.events == [
+        {"kind": "delta", "text": "a" * 40 + "b" * 40},
+        {"kind": "tool", "tool": "t"},
+        {"kind": "delta", "text": "c"},
+    ]
 
 
 async def test_duplicate_fact_is_not_stored_twice() -> None:

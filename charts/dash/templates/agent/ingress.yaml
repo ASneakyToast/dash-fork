@@ -1,0 +1,19 @@
+{{- if .Values.agent.dashboard.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dash-agent
+  labels: {{- include "dash.labels" (list . "dash-agent") | nindent 4 }}
+spec:
+  rules:
+    - host: {{ .Values.hosts.agent }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dash-agent
+                port:
+                  name: dashboard
+{{- end }}

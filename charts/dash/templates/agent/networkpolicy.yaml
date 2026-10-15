@@ -1,0 +1,42 @@
+{{- if .Values.networkPolicies.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dash-agent
+  labels: {{- include "dash.labels" (list . "dash-agent") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "dash.selectorLabels" (list . "dash-agent") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [dash-api, dash-worker] }
+      ports:
+        - port: api
+    {{- if .Values.agent.dashboard.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: dashboard
+    {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dash-sandbox
+  labels: {{- include "dash.labels" (list . "dash-sandbox") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "dash.selectorLabels" (list . "dash-sandbox") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {{- include "dash.selectorLabels" (list . "dash-agent") | nindent 14 }}
+      ports:
+        - port: ssh
+{{- end }}

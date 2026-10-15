@@ -1,0 +1,25 @@
+# Delete old versions of the private package ghcr.io/whatever/dashie-hut-junior.
+# Keep the newest versions. Each multi-arch push makes about 4 versions (index, amd64, arm64, attestation).
+name: Docker dashie-hut-junior cleanup
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write # delete versions with GITHUB_TOKEN
+    steps:
+      # Do not use delete-only-untagged-versions. The platform manifests of a multi-arch image are untagged.
+      - uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dashie-hut-junior
+          package-type: container
+          min-versions-to-keep: 80
