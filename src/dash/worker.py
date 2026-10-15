@@ -5,11 +5,12 @@ import logging
 import socket
 import uuid
 from collections.abc import AsyncIterator, Mapping, Sequence
-from typing import Protocol
+from typing import Any, Protocol
 
 from redis.exceptions import RedisError
 
 from dash.db import Store
+from dash.hermes import Delta
 from dash.memory import (
     DUPLICATE_DISTANCE,
     RELEVANT_DISTANCE,
@@ -27,8 +28,16 @@ FLUSH_CHARS = 48
 RETRY_SECONDS = 2
 
 
+def record(log: list[dict[str, Any]], kind: str, data: Mapping[str, Any]) -> None:
+    """Append an event, merging runs of text or reasoning into one entry."""
+    if kind in ("delta", "reasoning") and log and log[-1]["kind"] == kind:
+        log[-1]["text"] += data.get("text", "")
+    else:
+        log.append({"kind": kind, **data})
+
+
 class Chat(Protocol):
-    def stream(self, messages: Sequence[Mapping[str, str]]) -> AsyncIterator[str]: ...
+    def stream(self, messages: Sequence[Mapping[str, str]]) -> AsyncIterator[Delta]: ...
 
 
 class Worker:
@@ -94,9 +103,16 @@ class Worker:
             await self.note("failed", job, message="No user message to answer.")
             return
         user_text = history[-1].content
+        # Everything the UI is shown, in order, so the reply can be rebuilt after a reload.
+        trail: list[dict[str, Any]] = []
+
+        async def emit(kind: str, **data: Any) -> None:
+            await self.queue.emit(job.job_id, kind, **data)
+            record(trail, kind, data)
+
         memories = await self.recall(user_text)
         if memories:
-            await self.queue.emit(job.job_id, "memories", items=memories)
+            await emit("memories", items=memories)
             await self.note("recalled", job, count=len(memories))
 
         messages: list[dict[str, str]] = []
@@ -106,24 +122,38 @@ class Worker:
         messages += [{"role": m.role, "content": m.content} for m in history]
 
         reply: list[str] = []
-        buffer = ""
+        buffers = {"text": "", "reasoning": ""}
+        events = {"text": "delta", "reasoning": "reasoning"}
+
+        async def flush(kind: str) -> None:
+            if buffers[kind]:
+                await emit(events[kind], text=buffers[kind])
+                buffers[kind] = ""
+
         try:
             async for delta in self.chat.stream(messages):
-                reply.append(delta)
-                buffer += delta
-                if len(buffer) >= FLUSH_CHARS:
-                    await self.queue.emit(job.job_id, "delta", text=buffer)
-                    buffer = ""
+                if delta.kind in buffers:
+                    other = "reasoning" if delta.kind == "text" else "text"
+                    await flush(other)
+                    if delta.kind == "text":
+                        reply.append(delta.text)
+                    buffers[delta.kind] += delta.text
+                    if len(buffers[delta.kind]) >= FLUSH_CHARS:
+                        await flush(delta.kind)
+                else:
+                    await flush("reasoning")
+                    await flush("text")
+                    await emit(delta.kind, **delta.data)
         except Exception as ex:
             log.exception("hermes call failed")
             await self.queue.emit(job.job_id, "error", message=f"hermes: {ex}")
             await self.note("failed", job, message=f"hermes: {ex}")
             return
-        if buffer:
-            await self.queue.emit(job.job_id, "delta", text=buffer)
+        await flush("reasoning")
+        await flush("text")
 
         text = "".join(reply)
-        message = await self.store.add_message(conversation_id, "assistant", text)
+        message = await self.store.add_message(conversation_id, "assistant", text, trail)
         await self.queue.emit(job.job_id, "done", message_id=message.id)
         await self.note("done", job)
         stored = await self.remember(user_text, text)

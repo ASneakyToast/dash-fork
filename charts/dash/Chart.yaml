@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dash
+description: dash, its hermes agent, the agent sandbox, Nango and Redis.
+type: application
+version: 0.1.0
+appVersion: sha-fe41f19

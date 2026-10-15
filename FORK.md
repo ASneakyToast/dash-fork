@@ -54,13 +54,14 @@ Never in a topic branch:
 |---|---|---|
 | OpenAI-compatible memory | `feat/openai-compatible-memory` | Has a `fixup!` commit. Matt squash-merges (his history is one commit per PR), so it vanishes on merge; squash only for a tidier review. Spec: `openspec/changes/openai-compatible-memory/`. |
 | OpenSpec baseline specs | `chore/openspec` | Merged here. |
-| Mobile UI | `feat/mobile-layout` | **Duplicate:** the fork line has its own commit (`0d32b73`). |
 | Plugin system + dash-brood | `claude/dash-plugin-system-ue2bwa` | **Duplicate:** the fork line has its own commits. |
 | Theming | `claude/dash-theming` | **Duplicate:** the fork line merged PR #6, a port onto the fork line. |
 
 Not in `joel-dash/main` on purpose: `joel-dash/acp` (ACP agents).
 
 **Duplicates collapse on upstream merge.** When a topic branch lands in `whatever/dash`, refresh `main`, merge `upstream/main` into `joel-dash/main` (rule 5), and expect conflicts where the fork's copy differs. Resolve toward upstream's version unless the fork copy adds something.
+
+**Upstream CSS uses the old color variables.** The fork's theming renamed them, so every upstream merge must map new `var(--bg)`, `--panel`, `--line`, `--muted`, `--accent`, `--user` and `#dc2626` in `src/dash/static/` to `--dash-color-bg`, `-surface`, `-border`, `-text-muted`, `-accent`, `-bubble-user` and `-danger`. Check with `grep -rnE 'var\(--(bg|panel|line|muted|accent|user)\)|#dc2626' src/dash/static/`, which must print nothing.
 
 ## Settings outside the repo
 

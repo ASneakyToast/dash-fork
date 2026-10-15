@@ -1,0 +1,18 @@
+#!/command/with-contenv sh
+set -eu
+if [ ! -x /usr/sbin/sshd ]; then
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends openssh-server
+fi
+# sshd gives sessions a clean env and the image gives hermes /bin/sh.
+# Hand login shells the gateway's env (venv PATH included) and bash.
+# Allowlist only: the container env also holds Bedrock credentials.
+for name in PATH PYTHONPATH HERMES_HOME VIRTUAL_ENV TMPDIR; do
+  eval "value=\${$name-}"
+  [ -z "$value" ] || printf "export %s='%s'\n" "$name" "$value"
+done > /etc/profile.d/hermes-env.sh
+usermod -s /bin/bash hermes
+mkdir -p /run/sshd /opt/data/.sshd
+chmod 0700 /opt/data/.sshd
+[ -f /opt/data/.sshd/ssh_host_ed25519_key ] || ssh-keygen -q -t ed25519 -N '' -f /opt/data/.sshd/ssh_host_ed25519_key
+exec /usr/sbin/sshd -D -e -f /etc/hermes-sshd/sshd_config

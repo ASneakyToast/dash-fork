@@ -20,23 +20,13 @@ async function api(path, opts = {}) {
 const state = { conversation: null, config: {} };
 const touch = matchMedia("(pointer: coarse)");
 
-$("#menu").addEventListener("click", () => {
-  const open = $("aside").classList.toggle("open");
-  $("#menu").setAttribute("aria-expanded", String(open));
-});
-
-function closeMenu() {
-  $("aside").classList.remove("open");
-  $("#menu").setAttribute("aria-expanded", "false");
-}
-
 // Tabs
 const tabHooks = {};
 
 function showTab(name) {
   document.querySelectorAll("nav button, .tab").forEach((n) => n.classList.remove("active"));
   document.querySelector(`nav button[data-tab="${name}"]`).classList.add("active");
-  closeMenu();
+  setConversationsOpen(false);
   $(`#tab-${name}`).classList.add("active");
   tabHooks[name]?.();
 }
@@ -54,11 +44,48 @@ tabHooks.apps = () => {
 };
 
 // Conversations
+function setConversationsOpen(open) {
+  $("aside").classList.toggle("open", open);
+  $("#toggle-conversations").setAttribute("aria-expanded", String(open));
+}
+
+$("#toggle-conversations").addEventListener("click", () =>
+  setConversationsOpen(!$("aside").classList.contains("open")),
+);
+
+function setSidebarCollapsed(collapsed) {
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  const btn = $("#toggle-sidebar");
+  btn.setAttribute("aria-expanded", String(!collapsed));
+  btn.textContent = collapsed ? "»" : "«";
+  btn.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  localStorage.setItem("sidebarCollapsed", collapsed ? "1" : "");
+}
+
+$("#toggle-sidebar").addEventListener("click", () =>
+  setSidebarCollapsed(!document.body.classList.contains("sidebar-collapsed")),
+);
+setSidebarCollapsed(Boolean(localStorage.getItem("sidebarCollapsed")));
+
 async function loadConversations() {
   const list = await api("/api/conversations");
   $("#conversations").replaceChildren(
     ...list.map((c) => {
-      const li = el("li", { textContent: c.title, title: c.title });
+      const del = el("button", { className: "delete", textContent: "×", title: "Delete conversation" });
+      del.setAttribute("aria-label", `Delete ${c.title}`);
+      del.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        if (!confirm(`Delete "${c.title}"?`)) return;
+        await api(`/api/conversations/${c.id}`, { method: "DELETE" });
+        if (c.id === state.conversation) {
+          state.conversation = null;
+          localStorage.removeItem("conversation");
+          $("#messages").replaceChildren();
+          setLoopy("idle");
+        }
+        loadConversations();
+      });
+      const li = el("li", { title: c.title }, el("span", { textContent: c.title }), del);
       if (c.id === state.conversation) li.classList.add("active");
       li.addEventListener("click", () => openConversation(c.id));
       return li;
@@ -77,10 +104,19 @@ function bubble(role, text) {
 async function openConversation(id) {
   state.conversation = id;
   localStorage.setItem("conversation", id);
-  closeMenu();
+  setLoopy("idle");
+  showTab("chat");
   const messages = await api(`/api/conversations/${id}/messages`);
   $("#messages").replaceChildren();
-  messages.forEach((m) => bubble(m.role, m.content));
+  messages.forEach((m) => {
+    const node = bubble(m.role, m.content);
+    if (m.events?.length) {
+      const render = renderer(node);
+      m.events.forEach(render);
+      render({ kind: "done" });
+      node.textContent = m.content;
+    }
+  });
   loadConversations();
 }
 
@@ -91,26 +127,107 @@ $("#new-chat").addEventListener("click", async () => {
 });
 
 // Sending and streaming
-function follow(jobId, node) {
+function pulse() {
+  $("#pulse").animate(
+    [
+      { transform: "scale(1.6)", background: "var(--dash-color-accent)", boxShadow: "0 0 0 6px color-mix(in srgb, var(--dash-color-accent) 30%, transparent)" },
+      { transform: "scale(1)", background: "var(--dash-color-border)", boxShadow: "0 0 0 0 transparent" },
+    ],
+    { duration: 400, easing: "ease-out" },
+  );
+}
+
+function setLoopy(loopyState, detail = "") {
+  const node = $("#loopy");
+  node.setAttribute("state", loopyState);
+  node.setAttribute("detail", detail);
+}
+
+function toolState(tool = "") {
+  if (/search/i.test(tool)) return "searching";
+  if (/read|extract|view|fetch/i.test(tool)) return "reading";
+  return "tool";
+}
+
+function loopyFor(ev) {
+  if (ev.kind === "reasoning") return ["thinking"];
+  if (ev.kind === "tool") return ev.status === "running" || !ev.status ? [toolState(ev.tool), ev.label || ev.tool] : null;
+  if (ev.kind === "delta") return ["writing"];
+  if (ev.kind === "status") return [$("#loopy").getAttribute("state") || "thinking", ev.message || ""];
+  if (ev.kind === "done") return ["done"];
+  if (ev.kind === "error") return ["error", ev.message || ""];
+  return null;
+}
+
+// Draws a reply's trace (thinking, tools, status) and text from its events, live or replayed.
+function renderer(node) {
+  const trace = el("div", { className: "trace" });
+  node.before(trace);
+  const tools = new Map();
+  let text = "";
+  let thinking = null;
+  const thought = () => {
+    if (!thinking) {
+      const body = el("div", { className: "thinking-body" });
+      thinking = el("details", { className: "thinking", open: true }, el("summary", { textContent: "Thinking" }), body);
+      thinking.body = body;
+      trace.append(thinking);
+    }
+    return thinking;
+  };
+  const settle = () => {
+    if (thinking) thinking.open = false;
+    thinking = null;
+  };
+  return (ev) => {
+    if (ev.kind === "delta") {
+      settle();
+      text += ev.text;
+      node.textContent = text;
+    } else if (ev.kind === "reasoning") {
+      thought().body.textContent += ev.text;
+    } else if (ev.kind === "tool") {
+      settle();
+      const id = ev.toolCallId || `${ev.tool}-${tools.size}`;
+      let row = tools.get(id);
+      if (!row) {
+        row = el("div", { className: "tool" });
+        tools.set(id, row);
+        trace.append(row);
+      }
+      if (ev.label || !row.label) row.label = ev.label || ev.tool;
+      row.dataset.status = ev.status || "running";
+      row.textContent = `${ev.emoji || "\u{1F527}"} ${ev.tool}${row.label && row.label !== ev.tool ? `: ${row.label}` : ""}`;
+    } else if (ev.kind === "status") {
+      trace.append(el("div", { className: "status", textContent: ev.message || JSON.stringify(ev) }));
+    } else if (ev.kind === "memories") {
+      trace.prepend(el("div", { className: "recalled", textContent: `Recalled ${ev.items.length} memories` }));
+    } else if (ev.kind === "done" || ev.kind === "error") {
+      settle();
+      tools.forEach((row) => row.dataset.status === "running" && (row.dataset.status = "completed"));
+      if (ev.kind === "error") {
+        node.classList.add("error");
+        node.textContent = text + `\n\n${ev.message}`;
+      }
+    }
+  };
+}
+
+function follow(jobId, node, conversation) {
   return new Promise((resolve) => {
     const source = new EventSource(`/api/jobs/${jobId}/events`);
-    let text = "";
+    const render = renderer(node);
     source.onmessage = (e) => {
       const ev = JSON.parse(e.data);
-      if (ev.kind === "delta") {
-        text += ev.text;
-        node.textContent = text;
-        node.scrollIntoView({ block: "end" });
-      } else if (ev.kind === "memories") {
-        node.after(el("div", { className: "recalled", textContent: `Recalled ${ev.items.length} memories` }));
-      } else if (ev.kind === "done" || ev.kind === "error") {
-        if (ev.kind === "error") {
-          node.classList.add("error");
-          node.textContent = text + `\n\n${ev.message}`;
-        }
+      if (ev.kind === "delta") pulse();
+      const next = conversation === state.conversation && loopyFor(ev);
+      if (next) setLoopy(...next);
+      render(ev);
+      if (ev.kind === "done" || ev.kind === "error") {
         source.close();
         resolve();
       }
+      node.scrollIntoView({ block: "end" });
     };
   });
 }
@@ -126,14 +243,17 @@ $("#composer").addEventListener("submit", async (e) => {
   $("#input").value = "";
   bubble("user", content);
   const node = bubble("assistant", "…");
+  const conversation = state.conversation;
+  setLoopy("thinking");
   try {
-    const { job_id } = await api(`/api/conversations/${state.conversation}/messages`, {
+    const { job_id } = await api(`/api/conversations/${conversation}/messages`, {
       method: "POST",
       body: { content },
     });
     loadConversations();
-    await follow(job_id, node);
+    await follow(job_id, node, conversation);
   } catch (err) {
+    if (conversation === state.conversation) setLoopy("error", String(err));
     node.classList.add("error");
     node.textContent = String(err);
   }
@@ -184,7 +304,13 @@ async function loadApps() {
     $("#app-list").replaceChildren(el("li", { textContent: "Nango is not configured." }));
     return;
   }
-  const { connections } = await api("/api/connections");
+  let connections;
+  try {
+    ({ connections } = await api("/api/connections"));
+  } catch (err) {
+    $("#app-list").replaceChildren(el("li", { className: "error", textContent: err.message }));
+    return;
+  }
   $("#app-list").replaceChildren(
     ...connections.map((c) => {
       const del = el("button", { textContent: "Disconnect" });
@@ -201,7 +327,13 @@ async function loadApps() {
 
 $("#connect").addEventListener("click", async () => {
   const { default: Nango } = await import("https://esm.sh/@nangohq/frontend@0.69");
-  const { token } = await api("/api/connections/session", { method: "POST" });
+  let token;
+  try {
+    ({ token } = await api("/api/connections/session", { method: "POST" }));
+  } catch (err) {
+    $("#app-list").replaceChildren(el("li", { className: "error", textContent: err.message }));
+    return;
+  }
   const nango = new Nango({ host: state.config.nango_host, connectSessionToken: token });
   nango.openConnectUI({
     baseURL: state.config.nango_connect_url || undefined,

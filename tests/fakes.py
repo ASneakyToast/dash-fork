@@ -2,10 +2,12 @@ import itertools
 import uuid
 from collections.abc import AsyncIterator, Mapping, Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 from dash.db import Authorization, Conversation, Memory, Message
 from dash.github.api import Installation, NewApp
 from dash.github.db import APP, INSTALLATION, PROVIDER
+from dash.hermes import Delta
 
 CLIENT_SECRET = "fake-client-secret"  # noqa: S105
 
@@ -31,11 +33,29 @@ class FakeStore:
     async def conversation(self, conversation_id: uuid.UUID) -> Conversation | None:
         return self.convs.get(conversation_id)
 
+    async def delete_conversation(self, conversation_id: uuid.UUID) -> bool:
+        if self.convs.pop(conversation_id, None) is None:
+            return False
+        self.msgs = [m for m in self.msgs if m.conversation_id != conversation_id]
+        return True
+
     async def messages(self, conversation_id: uuid.UUID) -> list[Message]:
         return [m for m in self.msgs if m.conversation_id == conversation_id]
 
-    async def add_message(self, conversation_id: uuid.UUID, role: str, content: str) -> Message:
-        m = Message(id=next(self._ids), conversation_id=conversation_id, role=role, content=content)
+    async def add_message(
+        self,
+        conversation_id: uuid.UUID,
+        role: str,
+        content: str,
+        events: Sequence[dict[str, Any]] = (),
+    ) -> Message:
+        m = Message(
+            id=next(self._ids),
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            events=list(events),
+        )
         self.msgs.append(m)
         return m
 
@@ -88,15 +108,15 @@ class FakeExtractor:
 
 
 class FakeChat:
-    def __init__(self, chunks: list[str], fail: bool = False) -> None:
+    def __init__(self, chunks: list[str | Delta], fail: bool = False) -> None:
         self.chunks = chunks
         self.fail = fail
         self.seen: list[list[dict[str, str]]] = []
 
-    async def stream(self, messages: Sequence[Mapping[str, str]]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Mapping[str, str]]) -> AsyncIterator[Delta]:
         self.seen.append([dict(m) for m in messages])
         for chunk in self.chunks:
-            yield chunk
+            yield Delta("text", chunk) if isinstance(chunk, str) else chunk
         if self.fail:
             raise RuntimeError("upstream down")
 

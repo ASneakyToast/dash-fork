@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dash-worker
+  labels: {{- include "dash.labels" (list . "dash-worker") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {{- include "dash.selectorLabels" (list . "dash-worker") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dash.selectorLabels" (list . "dash-worker") | nindent 8 }}
+      annotations:
+        checksum/env: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: worker
+          image: {{ include "dash.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [dash, worker]
+          {{- include "dash.env" . | nindent 10 }}
+          resources:
+            requests: { cpu: 20m, memory: 128Mi }
+            limits: { memory: 384Mi }

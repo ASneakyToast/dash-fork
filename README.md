@@ -39,6 +39,15 @@ uv run dash worker &
 uv run dash serve
 ```
 
+To run the Helm chart (`charts/dash`) on Rancher Desktop (dockerd runtime, Traefik on):
+
+```sh
+just k8s-up            # builds dash:local, writes .local/secrets.json from .env, installs the chart
+just k8s-ps            # also: just k8s-logs [-f] <deployment>, just k8s-down, just k8s-nuke
+```
+
+Then open http://dash.localhost. `values-local.yaml` swaps RDS for an in-cluster pgvector and the ExternalSecrets for plain Secrets. The `dash-bedrock` Secret needs `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `.env`. With no values, `helm template` renders the prod objects from `geometry.dev/apps/dash`.
+
 The worker needs AWS credentials for Bedrock in the standard env chain, unless `MEMORY_BASE_URL` is set. Outside Docker, Nango is optional. To use it, set `NANGO_URL` and `NANGO_SECRET_KEY`.
 
 ## Plugins

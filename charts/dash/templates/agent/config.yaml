@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dash-agent-config
+  labels: {{- include "dash.labels" (list . "dash-agent") | nindent 4 }}
+data:
+  config.yaml: |
+    {{- tpl (.Files.Get "files/hermes-config.yaml") . | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dash-agent-sshd
+  labels: {{- include "dash.labels" (list . "dash-agent") | nindent 4 }}
+data:
+  type: {{ .Files.Get "files/sshd/type" | quote }}
+  run: {{ .Files.Get "files/sshd/run" | quote }}
+  sshd_config: {{ .Files.Get "files/sshd/sshd_config" | quote }}
+  empty: ""

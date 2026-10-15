@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dash-sandbox
+  labels: {{- include "dash.labels" (list . "dash-sandbox") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "dash.selectorLabels" (list . "dash-sandbox") | nindent 4 }}
+  ports:
+    - name: ssh
+      port: 2222
+      targetPort: ssh

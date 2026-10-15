@@ -8,7 +8,7 @@ from alembic.script import ScriptDirectory
 
 from dash.config import Settings
 from dash.db import EMBED_DIM, alembic_config, async_url
-from dash.hermes import parse_sse_line
+from dash.hermes import Delta, parse_sse_frame
 from dash.memory import OpenAICompatible, memory_models, parse_facts, system_prompt
 
 URL = "postgresql://dash:p%40ss@db:5432/dash"
@@ -35,13 +35,27 @@ def test_offline_upgrade_creates_vector_tables() -> None:
     assert "REFERENCES conversations (id) ON DELETE CASCADE" in sql
 
 
-def test_parse_sse_line() -> None:
-    chunk = 'data: {"choices":[{"delta":{"content":"hi"}}]}'
-    assert parse_sse_line(chunk) == "hi"
-    assert parse_sse_line("data: [DONE]") is None
-    assert parse_sse_line(": keep-alive") is None
-    assert parse_sse_line('data: {"choices":[{"delta":{"role":"assistant"}}]}') is None
-    assert parse_sse_line('data: {"choices":[]}') is None
+def test_parse_sse_frame() -> None:
+    assert parse_sse_frame(None, '{"choices":[{"delta":{"content":"hi"}}]}') == [
+        Delta("text", "hi")
+    ]
+    assert parse_sse_frame(None, "[DONE]") == []
+    assert parse_sse_frame(None, '{"choices":[{"delta":{"role":"assistant"}}]}') == []
+    assert parse_sse_frame(None, '{"choices":[]}') == []
+    assert parse_sse_frame(None, '{"choices":[{"delta":{"reasoning_content":"hmm"}}]}') == [
+        Delta("reasoning", "hmm")
+    ]
+    tool = '{"tool":"terminal","label":"ls","toolCallId":"c1","status":"running"}'
+    assert parse_sse_frame("hermes.tool.progress", tool) == [
+        Delta(
+            "tool",
+            data={"tool": "terminal", "label": "ls", "toolCallId": "c1", "status": "running"},
+        )
+    ]
+    assert parse_sse_frame("hermes.status", '{"message":"retrying"}') == [
+        Delta("status", data={"message": "retrying"})
+    ]
+    assert parse_sse_frame("approval.request", '{"x":1}') == []
 
 
 def test_parse_facts() -> None:

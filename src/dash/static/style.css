@@ -9,13 +9,16 @@ nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 10px; }
 button { font: inherit; border: 1px solid var(--dash-color-border); background: var(--dash-color-surface); color: var(--dash-color-text); border-radius: var(--dash-radius-control); padding: 6px 10px; cursor: pointer; }
 button:hover { border-color: var(--dash-color-accent); }
 nav button.active { background: var(--dash-color-accent); color: var(--dash-color-on-accent); border-color: var(--dash-color-accent); }
-#sidebar-chats { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-#menu { display: none; }
 #new-chat { margin: 0 10px 8px; }
 ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
-#conversations li { padding: 8px 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#conversations li { padding: 8px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+#conversations li span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#conversations li .delete { border: none; background: none; padding: 0 4px; opacity: 0; color: inherit; }
+#conversations li:hover .delete, #conversations li .delete:focus { opacity: 0.6; }
+#conversations li .delete:hover { opacity: 1; color: var(--dash-color-accent); }
+@media (hover: none) { #conversations li .delete { opacity: 0.6; } }
 #conversations li.active, #conversations li:hover { background: var(--dash-color-bg); }
-main { flex: 1; display: flex; min-width: 0; min-height: 0; }
+main { flex: 1; display: flex; min-width: 0; }
 .tab { display: none; flex: 1; flex-direction: column; padding: 16px; gap: 12px; min-width: 0; }
 .tab.active { display: flex; }
 #messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
@@ -23,6 +26,15 @@ main { flex: 1; display: flex; min-width: 0; min-height: 0; }
 .msg.user { align-self: flex-end; background: var(--dash-color-bubble-user); }
 .msg.assistant { align-self: flex-start; background: var(--dash-color-surface); border: 1px solid var(--dash-color-border); }
 .msg.error { border-color: var(--dash-color-danger); color: var(--dash-color-danger); }
+li.error { color: var(--dash-color-danger); }
+.trace { align-self: flex-start; max-width: 760px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--dash-color-text-muted); }
+.trace:empty { display: none; }
+.thinking summary { cursor: pointer; }
+.thinking-body { white-space: pre-wrap; padding: 4px 0 4px 12px; border-left: 2px solid var(--dash-color-border); font-style: italic; }
+.tool { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.tool[data-status="running"]::after { content: " …"; }
+.tool[data-status="failed"] { color: var(--dash-color-danger); }
+.status { font-style: italic; }
 .recalled { font-size: 12px; color: var(--dash-color-text-muted); margin-top: 6px; }
 #composer, #memory-add { display: flex; gap: 8px; }
 textarea, input { flex: 1; font: inherit; padding: 8px 10px; border: 1px solid var(--dash-color-border); border-radius: var(--dash-radius-control); background: var(--dash-color-surface); color: var(--dash-color-text); }
@@ -35,33 +47,44 @@ select { font: inherit; padding: 4px 8px; border: 1px solid var(--dash-color-bor
 h2 { font-size: 16px; margin: 12px 0 0; }
 #github-create { display: flex; gap: 8px; }
 #github-create input { flex: 1; }
-
+#memory-list li > div:first-child, #app-list li > div:first-child, #github-list li > div:first-child, #plugin-list li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+#toggle-conversations { display: none; }
+#sidebar-body { display: contents; }
+#toggle-sidebar { padding: 2px 8px; }
+@media (min-width: 701px) {
+  body.sidebar-collapsed aside { width: 48px; }
+  body.sidebar-collapsed aside header { padding: 12px 8px; justify-content: center; }
+  body.sidebar-collapsed aside header > :not(#toggle-sidebar), body.sidebar-collapsed #sidebar-body { display: none; }
+}
+#loopy { flex-shrink: 0; align-self: flex-start; color: var(--dash-color-text-muted); }
+#pulse { align-self: center; flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--dash-color-border); }
+@media (pointer: coarse) {
+  textarea, input { font-size: 16px; }
+}
 @media (max-width: 700px) {
-  :root { font-size: 16px; }
-  body { flex-direction: column; }
-  aside { width: 100%; border-right: 0; border-bottom: 1px solid var(--dash-color-border); padding-top: env(safe-area-inset-top); }
-  aside header { gap: 8px; padding: 8px 12px; }
-  #queue { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
-  #menu { display: block; }
+  body { flex-direction: column; height: 100dvh; }
+  aside { width: 100%; border-right: 0; border-bottom: 1px solid var(--dash-color-border); flex-shrink: 0; }
+  aside header { padding: 8px 12px; gap: 8px; }
+  aside header h1 { flex: 1; }
+  #toggle-conversations { display: inline-block; }
+  #toggle-sidebar { display: none; }
   nav { padding: 0 12px 8px; }
   nav button { flex: 1; }
-  button { min-height: 44px; }
-  #sidebar-chats { display: none; max-height: 45dvh; }
-  aside.open #sidebar-chats { display: flex; }
+  button { min-height: 40px; }
+  #new-chat, #conversations { display: none; }
+  aside.open #new-chat { display: block; }
+  aside.open #conversations { display: block; max-height: 40dvh; }
   #new-chat { margin: 0 12px 8px; }
-  #conversations li { padding: 12px 14px; }
+  #conversations li { padding: 12px; }
+  main { flex: 1; min-height: 0; }
   .tab { padding: 12px; overflow-y: auto; }
-  #tab-chat { overflow-y: visible; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  #tab-chat { overflow-y: visible; }
+  textarea, input { min-width: 0; }
   .msg { max-width: 92%; }
-  textarea, input, select { font-size: 16px; min-width: 0; }
-  select { min-height: 44px; }
   #composer { align-items: flex-end; }
-  #composer textarea { height: 48px; field-sizing: content; min-height: 48px; max-height: 40dvh; }
+  #pulse { align-self: flex-end; margin-bottom: 14px; }
   #memory-add, #github-create { flex-wrap: wrap; }
   #memory-add input, #github-create input { flex-basis: 100%; }
-  #memory-add button, #github-create button { flex: 1; }
-  #memory-list li, #app-list li, #github-list li, #plugin-list li { flex-direction: column; gap: 8px; overflow-wrap: anywhere; }
-  #memory-list li > button, #app-list li > button { align-self: flex-start; }
 }
 #dock { width: 320px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--dash-color-border); background: var(--dash-color-surface); }
 #dock[hidden] { display: none; }
