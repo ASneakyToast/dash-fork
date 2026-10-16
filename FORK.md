@@ -2,7 +2,7 @@
 
 <!-- KEEP THIS FILE IN SYNC: update it in the same PR as any change to the branch model, the fork-only files, the table of what joel-dash/main holds, or the fork's GitHub settings. -->
 
-This is `ASneakyToast/dash-fork`, Joel's fork of [`whatever/dash`](https://github.com/whatever/dash) (Matt's repo). Read this before creating a branch, committing, or opening a PR.
+This is `joellithgow95/dash-fork`, Joel's fork of [`whatever/dash`](https://github.com/whatever/dash) (Matt's repo). Read this before creating a branch, committing, or opening a PR.
 
 The goal: Joel runs a customized dash, and good changes still go to Matt cleanly. One rule makes both work: **a branch that can go to Matt never contains a fork-only file.**
 
@@ -40,7 +40,7 @@ Setup once: `git remote add upstream https://github.com/whatever/dash`.
 
 Never in a topic branch:
 
-- `.github/workflows/joel-dash-build.yml` builds `joel-dash/**` pushes into `ghcr.io/asneakytoast/dash:joel-dash-<short-sha>`.
+- `.github/workflows/joel-dash-build.yml` builds `joel-dash/**` pushes into `ghcr.io/joellithgow95/dash:joel-dash-<short-sha>`.
 - `FORK.md`, `CLAUDE.md`, the pointer line at the top of `AGENTS.md`.
 - `.claude/` (OpenSpec commands and skills for Claude Code). Matt installs his own with `openspec init --tools <his>`.
 - `openspec/changes/<name>/`: changes that describe fork-only work.

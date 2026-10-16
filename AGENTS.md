@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> Fork (ASneakyToast/dash-fork): read `FORK.md` before branching or committing, and keep it up to date.
+> Fork (joellithgow95/dash-fork): read `FORK.md` before branching or committing, and keep it up to date.
 
 ## Code style
 
